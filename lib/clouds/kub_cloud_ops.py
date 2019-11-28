@@ -1023,6 +1023,7 @@ class KubCmds(CommonCloudFunctions) :
             _context = False
             _taint = False
             _node_name = False
+            _custom_scheduler = False
 
             _vmc_attr_list = self.osci.get_object(obj_attr_list["cloud_name"], "VMC", False, obj_attr_list["vmc"], False)
             cbdebug("Pool is: " + _vmc_attr_list["pool"])
@@ -1030,6 +1031,8 @@ class KubCmds(CommonCloudFunctions) :
                 _taint, _node_name = _vmc_attr_list["pool"].split(",")
             else :
                 _taint = _vmc_attr_list["pool"]
+            if "custom_scheduler" in _vmc_attr_list:
+                _custom_scheduler = _vmc_attr_list["custom_scheduler"]
 
             self.determine_instance_name(obj_attr_list)
             obj_attr_list["cloud_vm_name"] = obj_attr_list["cloud_vm_name"].lower()
@@ -1116,11 +1119,15 @@ class KubCmds(CommonCloudFunctions) :
                 # 2. Forced placement (_taint and _node_name are set in the INITAL_VMCS, like this:
                 #      [USER-DEFINED]
                 #      KUB_INITIAL_VMCS = cluster:taint;nodeName # It's kind of gross. We can make it better later.
+                # 3. Placement decision by a custom scheduler - selected iff custom_scheduler vmc attribute is set
                 #
                 # The 2nd options requires that you go "taint" the nodes that you want isolated
                 # so that containers from other tenants (or yourself) don't land on in unwanted places.
 
-                if not _taint and not _node_name :
+                if _custom_scheduler:
+                    cbdebug("Using custom scheduler: " + str(_custom_scheduler) + " while creating pod.")
+                    _obj["spec"]["schedulerName"] = _custom_scheduler
+                elif not _taint and not _node_name :
                     _obj["spec"]["affinity"] = {
                                          "podAntiAffinity" : {
                                            "requiredDuringSchedulingIgnoredDuringExecution" : [
@@ -1178,7 +1185,12 @@ class KubCmds(CommonCloudFunctions) :
                                   }
     
                         }
-                obj_attr_list["selector"] = "app:" + obj_attr_list["cloud_rs_name"] + ',' + "role:master,tier:backend" 
+
+                if _custom_scheduler:
+                    cbdebug("Using custom scheduler: " + str(_custom_scheduler) + " while creating replicaset.")
+                    _obj["spec"]["template"]["spec"]["schedulerName"] = _custom_scheduler
+
+                obj_attr_list["selector"] = "app:" + obj_attr_list["cloud_rs_name"] + ',' + "role:master,tier:backend"
 
             if obj_attr_list["abstraction"] == "deployment" :
                 _obj = { "apiVersion": "extensions/v1beta1", \
@@ -1209,6 +1221,10 @@ class KubCmds(CommonCloudFunctions) :
                                   }
     
                         }
+
+                if _custom_scheduler:
+                    cbdebug("Using custom scheduler: " + str(_custom_scheduler) + " while creating deployment.")
+                    _obj["spec"]["template"]["spec"]["schedulerName"] = _custom_scheduler
 
                 obj_attr_list["selector"] = "app:" + obj_attr_list["cloud_d_name"] + ',' + "role:master,tier:backend" 
                         
