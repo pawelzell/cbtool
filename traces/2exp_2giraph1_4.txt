@@ -1,0 +1,15 @@
+cldattach kub TESTKUB
+expid 2exp_2giraph1_4
+vmcattach all
+vmclist
+hostlist
+aiattach giraph
+vmlist
+waitfor 10m
+aiattach giraph
+vmlist
+waitfor 10m
+vmdetach all
+monextract all
+clddetach
+exit

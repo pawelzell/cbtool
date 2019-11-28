@@ -1,0 +1,13 @@
+cldattach kub TESTKUB
+expid 11exp_mixed3_4
+vmcattach all
+vmclist
+hostlist
+aiattach redis_ycsb
+aiattach giraph
+vmlist
+waitfor 10m
+vmdetach all
+monextract all
+clddetach
+exit
