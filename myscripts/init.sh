@@ -2,5 +2,5 @@
 SUF=""
 
 sudo redis-server /etc/redis/redis.conf &
-sudo cp mongod${SUF}.conf /etc/mongodb.conf &&
+sudo cp mongodb${SUF}.conf /etc/mongodb.conf &&
 sudo mongod --config /etc/mongodb.conf &
