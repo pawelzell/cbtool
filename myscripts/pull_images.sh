@@ -1,4 +1,5 @@
-IMAGES="ubuntu_cb_ycsb"
+IMAGES="ubuntu_cb_giraph"
+#IMAGES="ubuntu_giraph ubuntu_cb_ycsb"
 
 for IMAGE in $IMAGES; do
 	IMAGE="ibmcb/${IMAGE}"

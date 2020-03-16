@@ -148,14 +148,18 @@ KUB_KEY_NAME = cbtool_rsa                                                       
 KUB_LOGIN = cbuser                                                                                                    # The username that logins on the VMs
 KUB_NAMESPACE = default
 
+[AI_TEMPLATES : CLOUDOPTION_MYKUB]
+GIRAPH_JAVA_HOME = /usr/lib/jvm/java-8-openjdk-amd64/jre/
+
+# [VMC_DEFAULTS : CLOUDOPTION_MYKUB]
+# CUSTOM_SCHEDULER = type-aware-scheduler
+
 # [VM_DEFAULTS : CLOUDOPTION_MYKUB]
 # UPDATE_ATTEMPTS = 600             # Pulling hadoop container may take 10min
 # IMAGE_PREFIX = pawelzell/ubuntu_
 # PORTS_BASE = 30000
 # [AI_DEFAULTS : CLOUDOPTION_MYKUB]
 # UPDATE_ATTEMPTS = 600
-[VMC_DEFAULTS : CLOUDOPTION_MYKUB]
-CUSTOM_SCHEDULER = type-aware-scheduler
 #-------------------------------------------------------------------------------
 # Azure Service Manager (AS) requires the following parameters (via LibCloud)
 [USER-DEFINED : CLOUDOPTION_MYAS ]

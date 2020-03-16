@@ -149,6 +149,9 @@ KUB_LOGIN = cbuser                                                              
 KUB_NAMESPACE = default  #[AI_DEFAULTS : KUB_CLOUDCONFIG]
 [VM_DEFAULTS : CLOUDOPTION_MYKUB]
 UPDATE_ATTEMPTS = 600             # Pulling hadoop container may take 10min
+[AI_TEMPLATES : CLOUDOPTION_MYKUB]
+GIRAPH_JAVA_HOME = /usr/lib/jvm/java-8-openjdk-amd64/jre/
+
 #IMAGE_PREFIX = pawelzell/ubuntu_
 #PORTS_BASE = 30000
 [AI_DEFAULTS : CLOUDOPTION_MYKUB]

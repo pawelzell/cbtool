@@ -1,16 +1,15 @@
 cldattach kub TESTKUB
 expid 4exp_redis_ycsb
-cldalter vmc_defaults custom_scheduler=type-aware-scheduler
 vmcattach all
 vmclist
 hostlist
-cldalter vmc_defaults custom_scheduler=type-aware-scheduler
 aiattach redis_ycsb
 vmlist
-waitfor 30s
 aiattach redis_ycsb
 vmlist
-waitfor 1min
+aiattach redis_ycsb
+vmlist
+waitfor 10min
 vmdetach all
 monextract all
 clddetach
