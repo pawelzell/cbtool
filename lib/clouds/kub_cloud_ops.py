@@ -1000,7 +1000,25 @@ class KubCmds(CommonCloudFunctions) :
         finally :                
             _status, _msg = self.common_messages("VV", obj_attr_list, "destroyed", _status, _fmsg)
             return _status, _msg
-    
+
+    @trace
+    def set_resources_constraints(self, _obj, obj_attr_list):
+        _resources_obj = { "limits": dict(), "requests": dict() }
+
+        for resource in ["cpu", "memory"]:
+            for bound_type in ["limits", "requests"]:
+                key = "{}_{}".format(resource, bound_type)
+                if key in obj_attr_list:
+                    cdebug("Setting resource constraint - {}: {}".format(key, obj_attr_list[key]))
+                    _resources_obj[bound_type][resource] = obj_attr_list[key]
+
+        if _obj["kind"] == "Pod":
+            _obj["spec"]["containers"][0]["resources"] = _resources_obj
+        if _obj["kind"] == "ReplicaSet" or \
+                        _obj["kind"] == "Deployment":
+            _obj["spec"]["template"]["spec"]["containers"][0]["resources"] = _resources_obj
+
+
     @trace
     def vmcreate(self, obj_attr_list) :
         '''
@@ -1226,8 +1244,10 @@ class KubCmds(CommonCloudFunctions) :
                     cbdebug("Using custom scheduler: " + str(_custom_scheduler) + " while creating deployment.")
                     _obj["spec"]["template"]["spec"]["schedulerName"] = _custom_scheduler
 
-                obj_attr_list["selector"] = "app:" + obj_attr_list["cloud_d_name"] + ',' + "role:master,tier:backend" 
-                        
+                obj_attr_list["selector"] = "app:" + obj_attr_list["cloud_d_name"] + ',' + "role:master,tier:backend"
+
+
+            self.set_resources_constraints(_obj, obj_attr_list)
             self.vm_placement(obj_attr_list)
 
             _cpu, _memory = obj_attr_list["size"].split('-')
