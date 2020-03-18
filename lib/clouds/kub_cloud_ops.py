@@ -1009,7 +1009,7 @@ class KubCmds(CommonCloudFunctions) :
             for bound_type in ["limits", "requests"]:
                 key = "{}_{}".format(resource, bound_type)
                 if key in obj_attr_list:
-                    cdebug("Setting resource constraint - {}: {}".format(key, obj_attr_list[key]))
+                    cbdebug("Setting resource constraint - {}: {}".format(key, obj_attr_list[key]))
                     _resources_obj[bound_type][resource] = obj_attr_list[key]
 
         if _obj["kind"] == "Pod":
