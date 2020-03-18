@@ -1047,6 +1047,9 @@ class KubCmds(CommonCloudFunctions) :
             cbdebug("Pool is: " + _vmc_attr_list["pool"])
             if _vmc_attr_list["pool"].count(",") :
                 _taint, _node_name = _vmc_attr_list["pool"].split(",")
+            elif "node_name" in _obj_attr_list:
+                _node_name = _obj_attr_list["node_name"]
+                cbdebug("Node name is: " + _node_name)
             else :
                 _taint = _vmc_attr_list["pool"]
             if "custom_scheduler" in _vmc_attr_list:

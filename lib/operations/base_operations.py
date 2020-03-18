@@ -2094,17 +2094,22 @@ class BaseObjectOperations :
         return _nr_vms, _vm_role
 
     @trace
+    def get_custom_attr_keys(self):
+        for resource in ["cpu", "memory"]:
+            for constraint in ["requests", "limits"]:
+                yield "{}_{}".format(resource, constraint)
+        yield "node_name"
+
+    @trace
     def propagate_ai_attributes_to_vm(self, vm_role, cloud_ips, obj_attr_list) :
         '''
         TBD
         '''
         _custom_attr_list = dict()
-        for resource in ["cpu", "memory"]:
-            for constraint in ["requests", "limits"]:
-                vm_key = "{}_{}".format(resource, constraint)
-                ai_key = "{}_{}".format(vm_role, vm_key)
-                if ai_key in obj_attr_list:
-                    _custom_attr_list[vm_key] = obj_attr_list[ai_key]
+        for vm_key in self.get_custom_attr_keys():
+            ai_key = "{}_{}".format(vm_role, vm_key)
+            if ai_key in obj_attr_list:
+                _custom_attr_list[vm_key] = obj_attr_list[ai_key]
 
         if vm_role + "_pref_host" in obj_attr_list :
             _pool = obj_attr_list[vm_role + "_pref_host"]
