@@ -1047,9 +1047,9 @@ class KubCmds(CommonCloudFunctions) :
             cbdebug("Pool is: " + _vmc_attr_list["pool"])
             if _vmc_attr_list["pool"].count(",") :
                 _taint, _node_name = _vmc_attr_list["pool"].split(",")
-            elif "node_name" in _obj_attr_list:
-                _node_name = _obj_attr_list["node_name"]
-                cbdebug("Node name is: " + _node_name)
+            elif "node_name" in obj_attr_list:
+                _node_name = obj_attr_list["node_name"]
+                cbdebug("Setting node name from obj_attr_list to: " + _node_name)
             else :
                 _taint = _vmc_attr_list["pool"]
             if "custom_scheduler" in _vmc_attr_list:
@@ -1148,7 +1148,7 @@ class KubCmds(CommonCloudFunctions) :
                 if _custom_scheduler:
                     cbdebug("Using custom scheduler: " + str(_custom_scheduler) + " while creating pod.")
                     _obj["spec"]["schedulerName"] = _custom_scheduler
-                elif not _taint and not _node_name :
+                if not _taint and not _node_name :
                     _obj["spec"]["affinity"] = {
                                          "podAntiAffinity" : {
                                            "requiredDuringSchedulingIgnoredDuringExecution" : [

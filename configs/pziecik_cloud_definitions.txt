@@ -151,8 +151,8 @@ KUB_NAMESPACE = default
 [AI_TEMPLATES : CLOUDOPTION_MYKUB]
 GIRAPH_JAVA_HOME = /usr/lib/jvm/java-8-openjdk-amd64/jre/
 
-# [VMC_DEFAULTS : CLOUDOPTION_MYKUB]
-# CUSTOM_SCHEDULER = type-aware-scheduler
+[VMC_DEFAULTS : CLOUDOPTION_MYKUB]
+CUSTOM_SCHEDULER = type-aware-scheduler
 
 # [VM_DEFAULTS : CLOUDOPTION_MYKUB]
 # UPDATE_ATTEMPTS = 600             # Pulling hadoop container may take 10min
