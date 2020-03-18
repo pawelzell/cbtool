@@ -2098,6 +2098,14 @@ class BaseObjectOperations :
         '''
         TBD
         '''
+        _custom_attr_list = dict()
+        for resource in ["cpu", "memory"]:
+            for constraint in ["requests", "limits"]:
+                vm_key = "{}_{}".format(resource, constraint)
+                ai_key = "{}_{}".format(vm_role, vm_key)
+                if ai_key in obj_attr_list:
+                    _custom_attr_list[vm_key] = obj_attr_list[ai_key]
+
         if vm_role + "_pref_host" in obj_attr_list :
             _pool = obj_attr_list[vm_role + "_pref_host"]
         else :
@@ -2146,7 +2154,7 @@ class BaseObjectOperations :
         if obj_attr_list["load_balancer"].strip().lower() == "true" :
             _size = 'load_balanced_default'                
 
-        return _pool, _meta_tag, _size, _extra_parms
+        return _pool, _meta_tag, _size, _custom_attr_list, _extra_parms
 
     @trace
     def create_vm_list_for_ai(self, obj_attr_list) :
@@ -2217,7 +2225,7 @@ class BaseObjectOperations :
                     else :
                         obj_attr_list["load_generator_target_role"] = _tiers[_tier_nr].split("_x_")[1]
 
-                _pool, _meta_tag, _size, _extra_parms = \
+                _pool, _meta_tag, _size, _custom_attr_list, _extra_parms = \
                 self.propagate_ai_attributes_to_vm(_vm_role, _cloud_ips, obj_attr_list) 
 
                 _attach_action = obj_attr_list["vm_attach_action"]
@@ -2256,6 +2264,7 @@ class BaseObjectOperations :
                     _vm_command_list += obj_attr_list["cloud_name"] + ' ' +\
                      _vm_role + ", " + _pool + ", " + _meta_tag + ", " +\
                       _size + ", " + _attach_action + ", " + _extra_parms + _cloud_ip + "; "
+                    obj_attr_list["parallel_operations"][_vm_counter].update(_custom_attr_list)
                       
                     _vm_counter += 1
 
