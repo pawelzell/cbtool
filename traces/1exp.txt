@@ -1,0 +1,47 @@
+cldattach kub TESTKUB
+expid 16redis_giraph_baati
+vmcattach all
+vmclist
+typealter redis_ycsb redis_node_name=baati
+typealter redis_ycsb ycsb_node_name=baati
+typealter giraph giraphmaster_node_name=baati
+typealter giraph giraphslave_node_name=baati
+
+typealter giraph giraphmaster cpu_requests=1m
+typealter giraph giraphmaster cpu_limits=200m
+
+typealter giraph giraphslave cpu_requests=1m
+typealter giraph giraphslave cpu_limits=200m
+
+typealter giraph sut=giraphmaster->giraphslave
+typealter giraph replication_factor=1
+
+
+aiattach redis_ycsb
+vmlist
+waitfor 10m
+
+aiattach giraph
+vmlist
+waitfor 10m
+
+aiattach giraph
+vmlist
+waitfor 10m
+
+aiattach giraph
+vmlist
+waitfor 10m
+
+aiattach giraph
+vmlist
+waitfor 10m
+
+aiattach giraph
+vmlist
+waitfor 10m
+
+vmdetach all
+monextract all
+clddetach
+exit
