@@ -1,5 +1,5 @@
 cldattach kub TESTKUB
-expid 19redis_giraph_baati
+expid 23redis_giraph
 vmcattach all
 vmclist
 typealter redis_ycsb redis_node_name=baati
@@ -7,15 +7,17 @@ typealter redis_ycsb ycsb_node_name=baati
 typealter giraph giraphmaster_node_name=baati
 typealter giraph giraphslave_node_name=baati
 
-typealter giraph giraphmaster_cpu_requests=1m
-typealter giraph giraphmaster_cpu_limits=400m
-
-typealter giraph giraphslave_cpu_requests=1m
-typealter giraph giraphslave_cpu_limits=400m
-
 typealter giraph sut=giraphmaster->giraphslave
 typealter giraph replication_factor=1
 
+
+aiattach giraph
+vmlist
+waitfor 10m
+
+aiattach redis_ycsb
+vmlist
+waitfor 10m
 
 aiattach redis_ycsb
 vmlist
@@ -25,23 +27,7 @@ aiattach giraph
 vmlist
 waitfor 10m
 
-aiattach giraph
-vmlist
-waitfor 10m
-
-aiattach giraph
-vmlist
-waitfor 10m
-
-aiattach giraph
-vmlist
-waitfor 10m
-
-aiattach giraph
-vmlist
-waitfor 10m
-
-aiattach giraph
+aiattach redis_ycsb
 vmlist
 waitfor 10m
 
