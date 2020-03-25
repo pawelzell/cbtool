@@ -1,0 +1,62 @@
+cldattach kub TESTKUB
+expid 29open_daytrader
+vmcattach all
+vmclist
+typealter open_daytrader client_open_daytrader_cpu_requests=1m
+typealter open_daytrader client_open_daytrader_cpu_limits=400m
+
+typealter open_daytrader mysql_cpu_requests=1m
+typealter open_daytrader mysql_cpu_limits=400m
+
+typealter open_daytrader geronimo_cpu_requests=1m
+typealter open_daytrader geronimo_cpu_limits=400m
+
+aiattach open_daytrader
+vmlist
+waitfor 5m
+
+
+aiattach open_daytrader
+vmlist
+waitfor 5m
+
+aiattach open_daytrader
+vmlist
+waitfor 5m
+
+aiattach open_daytrader
+vmlist
+waitfor 5m
+
+aiattach open_daytrader
+vmlist
+waitfor 5m
+
+aiattach open_daytrader
+vmlist
+waitfor 5m
+
+aiattach open_daytrader
+vmlist
+waitfor 5m
+
+aiattach open_daytrader
+vmlist
+waitfor 5m
+
+aiattach open_daytrader
+vmlist
+waitfor 5m
+
+aiattach open_daytrader
+vmlist
+waitfor 5m
+
+aiattach open_daytrader
+vmlist
+waitfor 5m
+
+vmdetach all
+monextract all
+clddetach
+exit

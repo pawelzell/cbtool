@@ -4,7 +4,7 @@ MANAGER_IP = 10.9.99.2
 MAIN_UPDATE_FREQUENCY = 5
 MAIN_UPDATE_ATTEMPTS = 500 # changed from 36
 MAIN_NOTIFICATION = $False
-MAIN_ATTEMPTS = 3
+MAIN_ATTEMPTS = 3 # changed from 3
 MAIN_TIMEOUT = 240
 # Variable $USER auto-selects current username
 MAIN_USERNAME = $USER_AUTO
@@ -151,6 +151,8 @@ KUB_NAMESPACE = default
 [AI_TEMPLATES : CLOUDOPTION_MYKUB]
 GIRAPH_JAVA_HOME = /usr/lib/jvm/java-8-openjdk-amd64/jre/
 HADOOP_JAVA_HOME = /usr/lib/jvm/java-8-openjdk-amd64/jre/
+OPEN_DAYTRADER_JAVA_HOME = /usr/lib/jvm/jdk1.7.0_80/jre
+
 
 [VMC_DEFAULTS : CLOUDOPTION_MYKUB]
 CUSTOM_SCHEDULER = type-aware-scheduler

@@ -1,0 +1,41 @@
+cldattach kub TESTKUB
+expid 27sysbench
+vmcattach all
+vmclist
+typealter sysbench sysbench_cpu_requests=1m
+typealter sysbench sysbench_cpu_limits=400m
+
+typealter sysbench mysql_cpu_requests=1m
+typealter sysbench mysql_cpu_limits=400m
+typealter sysbench load_duration=120
+
+
+aiattach sysbench
+vmlist
+waitfor 10m
+
+
+aiattach sysbench
+vmlist
+waitfor 10m
+
+aiattach sysbench
+vmlist
+waitfor 10m
+
+aiattach sysbench
+vmlist
+waitfor 10m
+
+aiattach sysbench
+vmlist
+waitfor 10m
+
+aiattach sysbench
+vmlist
+waitfor 10m
+
+vmdetach all
+monextract all
+clddetach
+exit

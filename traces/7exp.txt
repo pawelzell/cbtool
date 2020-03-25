@@ -1,0 +1,48 @@
+cldattach kub TESTKUB
+expid 26hadoop
+vmcattach all
+vmclist
+typealter redis_ycsb redis_node_name=baati
+typealter redis_ycsb ycsb_node_name=baati
+typealter giraph giraphmaster_node_name=baati
+typealter giraph giraphslave_node_name=baati
+
+typealter hadoop sut=hadoopmaster->hadoopslave
+typealter hadoop replication_factor=1
+
+typealter hadoop hadoopmaster_cpu_requests=1m
+typealter hadoop hadoopmaster_cpu_limits=400m
+
+typealter hadoop hadoopslave_cpu_requests=1m
+typealter hadoop hadoopslave_cpu_limits=400m
+
+
+aiattach hadoop
+vmlist
+waitfor 10m
+
+
+aiattach hadoop
+vmlist
+waitfor 10m
+
+aiattach hadoop
+vmlist
+waitfor 10m
+
+aiattach hadoop
+vmlist
+waitfor 10m
+
+aiattach hadoop
+vmlist
+waitfor 10m
+
+aiattach hadoop
+vmlist
+waitfor 10m
+
+vmdetach all
+monextract all
+clddetach
+exit

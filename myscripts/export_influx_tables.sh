@@ -1,5 +1,11 @@
 kDB='type_aware_scheduler'
-kROLES="redis|ycsb|giraphmaster|giraphslave"
+kREDIS="redis|ycsb"
+KGIRAPH="giraphmaster|giraphslave"
+kHADOOP="hadoopmaster|hadoopslave"
+kSYSBENCH="sysbench|mysql"
+kDAYTRADER="client_open_daytrader|geronimo|mysql"
+
+kROLES="$kREDIS|$kGIRAPH|$kHADOOP|$kSYSBENCH|$kDAYTRADER"
 kMACHINES="baati|naan"
 
 kREG="^metric\/(pod\/default(\/[-[:alnum:]]{,}($kROLES)[-[:alnum:]]{,}){2}|node\/($kMACHINES))\/(cpu|memory)$"
