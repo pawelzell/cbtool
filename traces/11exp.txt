@@ -1,21 +1,11 @@
 cldattach kub TESTKUB
-expid 38giraph
+expid 42giraph
 vmcattach all
 vmclist
 
 cldalter ai_defaults run_limit=100000000
 typealter giraph sut=giraphmaster->giraphslave
-typealter giraph load_level=2
-
-aiattach giraph
-vmlist
-waitfor 10m
-
-typealter giraph giraphmaster_cpu_requests=1m
-typealter giraph giraphmaster_cpu_limits=400m
-
-typealter giraph giraphslave_cpu_requests=1m
-typealter giraph giraphslave_cpu_limits=400m
+typealter giraph load_level=1
 
 aiattach giraph
 vmlist
@@ -25,16 +15,19 @@ aiattach giraph
 vmlist
 waitfor 10m
 
-aiattach giraph
-vmlist
+aialter ai_2 load_level=2
 waitfor 10m
 
-aiattach giraph
-vmlist
+aialter ai_2 load_level=4
 waitfor 10m
 
-aiattach giraph
-vmlist
+aialter ai_2 load_level=8
+waitfor 10m
+
+aialter ai_2 load_level=16
+waitfor 10m
+
+aialter ai_2 load_level=32
 waitfor 10m
 
 monextract all
