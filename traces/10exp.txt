@@ -1,0 +1,42 @@
+cldattach kub TESTKUB
+expid 39redis
+vmcattach all
+vmclist
+
+cldalter ai_defaults run_limit=100000000
+
+aiattach redis_ycsb
+vmlist
+waitfor 10m
+
+typealter redis_ycsb redis_cpu_requests=1m
+typealter redis_ycsb redis_cpu_limits=400m
+
+typealter redis_ycsb ycsb_cpu_requests=1m
+typealter redis_ycsb ycsb_cpu_limits=400m
+
+
+aiattach redis_ycsb
+vmlist
+waitfor 10m
+
+aiattach redis_ycsb
+vmlist
+waitfor 10m
+
+aiattach redis_ycsb
+vmlist
+waitfor 10m
+
+aiattach redis_ycsb
+vmlist
+waitfor 10m
+
+aiattach redis_ycsb
+vmlist
+waitfor 10m
+
+
+monextract all
+clddetach
+exit
