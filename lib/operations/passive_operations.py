@@ -1720,6 +1720,7 @@ class PassiveObjectOperations(BaseObjectOperations) :
             _obj_attr_list = {}
             _status, _fmsg = self.parse_cli(_obj_attr_list, parameters, command)
             _msg = ""
+            _url = ""
 
             if not _status :
                 _status, _fmsg = self.initialize_object(_obj_attr_list, command)
