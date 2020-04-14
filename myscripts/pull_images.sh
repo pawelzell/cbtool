@@ -1,10 +1,14 @@
+if [[ $# -lt 1 ]]; then
+  echo "usage $0 <images>"
+  echo "example: $0 ycsb giraph"
+  exit 1
+fi
 kVER_SUF="-amd64"
-IMAGES="ubuntu_cb_sysbench ubuntu_cb_hadoop ubuntu_cb_giraph ubuntu_cb_ycsb"
 # ubuntu_cb_open_daytrader - do not pull, image from docker hub is broken. 
 # Fixed image should be present on baati
 
-for IMAGE in $IMAGES; do
-	IMAGE="ibmcb/${IMAGE}"
+for IMAGE in $@; do
+	IMAGE="ibmcb/ubuntu_cb_${IMAGE}"
 	IMAGE_FULL="${IMAGE}${kVER_SUF}"
 	echo "pull image ${IMAGE_FULL}"
 	sudo docker pull $IMAGE_FULL:master

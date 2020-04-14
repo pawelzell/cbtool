@@ -1,10 +1,9 @@
 cldattach kub TESTKUB
-expid 41redis
+expid 51redis
 vmcattach all
 vmclist
 
 cldalter ai_defaults run_limit=100000000
-typealter redis_ycsb load_level=1
 
 aiattach redis_ycsb
 vmlist
@@ -14,16 +13,20 @@ aiattach redis_ycsb
 vmlist
 waitfor 10m
 
-aialter ai_2 load_level=2
+aiattach redis_ycsb
+vmlist
 waitfor 10m
 
-aialter ai_2 load_level=3
+aiattach redis_ycsb
+vmlist
 waitfor 10m
 
-aialter ai_2 load_level=4
+aiattach redis_ycsb
+vmlist
 waitfor 10m
 
-aialter ai_2 load_level=8
+aiattach redis_ycsb
+vmlist
 waitfor 10m
 
 
