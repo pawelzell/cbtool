@@ -10,7 +10,7 @@ kTMP_DIR="../data"
 
 kSCRIPT_BASE_DIR=$PWD
 kREMOTE_DIR="/home/$kREMOTEUSER/cbtool/data"
-kEXPS=`ssh -J students baati ls /home/$kREMOTEUSER/cbtool/data`
+kEXPS=`ssh -J students $kREMOTEHOST ls /home/$kREMOTEUSER/cbtool/data`
 for kEXP in $kEXPS; do
   if [[ ! -e $kLOCAL_DIR/$kEXP ]]; then
 		echo "Copy $kEXP"
