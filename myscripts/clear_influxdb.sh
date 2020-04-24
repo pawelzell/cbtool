@@ -1,3 +1,4 @@
+#!/bin/bash
 kINFLUX_POD=`kubectl get pods | awk '/^influx/ {print $1}'`
 echo "Will clear influxdb database for pod: $kINFLUX_POD"
 

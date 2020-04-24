@@ -12,11 +12,10 @@ for kEXPFILE in $@; do
     echo "Pull image $kIMAGE"
     ./pull_images.sh $kIMAGE
   done
-  exit 0
   cd .. || exit 1
   echo "Will run cbtool for expfile: $kEXPFILE"
   kEXPID=`awk '/^expid/ {print}' $kEXPFILE | sed 's/expid //'`
-  echo "Detected exdbpid : $kEXPID"
+  echo "Detected expid : $kEXPID"
   sudo ./cb --soft_reset --trace $kEXPFILE
   cd -
   ./export_exp.sh $kEXPID

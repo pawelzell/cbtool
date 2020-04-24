@@ -1,3 +1,4 @@
+#!/bin/bash
 if [[ $# -lt 1 ]]; then
   echo "usage $0 <images>"
   echo "example: $0 ycsb giraph"
@@ -8,7 +9,7 @@ kVER_SUF="-amd64"
 # Fixed image should be present on baati
 
 for IMAGE in $@; do
-	if [ ${IMAGE: -4} == "ycsb" ]; then
+	if [[ ${IMAGE: -4} == "ycsb" ]]; then
 		IMAGE="ycsb"
 	fi
 	if [[ $IMAGE == "linpack" ]]; then
