@@ -12,6 +12,8 @@ vmcattach all
 vmclist
 
 cldalter ai_defaults run_limit=100000000
+typealter hadoop sut=hadoopmaster->hadoopslave
+typealter hadoop load_level=1
 typealter wrk load_level=1
 typealter wrk load_duration=1
 """

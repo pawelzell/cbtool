@@ -8,9 +8,16 @@ kVER_SUF="-amd64"
 # Fixed image should be present on baati
 
 for IMAGE in $@; do
-	IMAGE="ibmcb/ubuntu_cb_${IMAGE}"
-	IMAGE_FULL="${IMAGE}${kVER_SUF}"
-	echo "pull image ${IMAGE_FULL}"
-	sudo docker pull $IMAGE_FULL:master
-	sudo docker tag $IMAGE_FULL:master $IMAGE
+	if [ ${IMAGE: -4} == "ycsb" ]; then
+		IMAGE="ycsb"
+	fi
+	if [[ $IMAGE == "linpack" ]]; then
+		sudo docker load < linpack.tar
+	else
+		IMAGE="ibmcb/ubuntu_cb_${IMAGE}"
+		IMAGE_FULL="${IMAGE}${kVER_SUF}"
+		echo "pull image ${IMAGE_FULL}"
+		sudo docker pull $IMAGE_FULL:master
+		sudo docker tag $IMAGE_FULL:master $IMAGE
+	fi
 done
