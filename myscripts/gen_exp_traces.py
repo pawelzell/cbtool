@@ -1,11 +1,10 @@
 import sys
 import os
-import gen_exp_config as config
-
+import pandas as pd
+resource_data_csv = "resource.csv"
 hadoop_slave_no = 2
 
-cpu_requests = "typealter {} {}_cpu_requests=1m\n"
-cpu_limits = "typealter {} {}_cpu_limits={}m\n"
+resource_constraints = "typealter {type} {role}_{resource}_{constraint}={value}\n"
 hadoop_sut = "typealter hadoop sut=hadoopmaster->{}_x_hadoopslave\n"
 
 prefix = \
@@ -34,6 +33,26 @@ clddetach
 exit
 """
 
+def get_resource_constraints():
+    results = []
+    df = pd.read_csv(resource_data_csv)
+    for row in df.itertuples():
+        if row.resource == "cpu":
+            requests = "1"
+            limits = int(2 * row.avg)
+        elif row.resource == "memory":
+            requests = int(row.avg)
+            limits = int(2 * row.avg)
+        else:
+            print(f"Unknown resource {row.resource}")
+            continue
+        for constraint, value in [("requests", requests), ("limits", limits)]:
+            result = {"type": row.type, "role": row.role, "resource": row.resource}
+            result.update({"constraint": constraint, "value": f"{value}{row.unit}"})
+            results.append(result)
+    return results
+
+
 def set_hadoop_sut(f, x, y):
     t = None
     if x.startswith("hadoop"):
@@ -49,7 +68,7 @@ def set_hadoop_sut(f, x, y):
         no = int(no_raw)
     f.write(hadoop_sut.format(no))
 
-def gen_exp(x, y, nr, task_count, interval="20m"):
+def gen_exp(x, y, nr, task_count, constraints, interval="20m"):
     basepath="../traces"
     if x == y:
         basename=f"{x}"
@@ -61,9 +80,8 @@ def gen_exp(x, y, nr, task_count, interval="20m"):
         f.write(f"# {x} {y} {task_count}\n")
         f.write(prefix.format(nr, basename))
         f.write(hadoop_sut.format(hadoop_slave_no))
-        for ai_type, role, limit in config.cpu_limits:
-            f.write(cpu_requests.format(ai_type, role))
-            f.write(cpu_limits.format(ai_type, role, limit))
+        for c in constraints:
+            f.write(resource_constraints.format(**c))
         f.write(instance.format(x, interval))
         for _ in range(task_count-1):
             f.write(instance.format(y, interval))
@@ -77,9 +95,10 @@ def main():
 
     nr = int(sys.argv[1])
     task_count = int(sys.argv[2])
+    constraints = get_resource_constraints()
     for x in sys.argv[3:]:
         for y in sys.argv[3:]:
-            nr = gen_exp(x, y, nr, task_count)
+            nr = gen_exp(x, y, nr, task_count, constraints)
     print(f"Hadoop slave number set to {hadoop_slave_no}")
 
 if __name__ == "__main__":
