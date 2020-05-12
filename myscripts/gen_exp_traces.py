@@ -41,8 +41,10 @@ def get_resource_constraints():
             requests = "1"
             limits = int(2 * row.avg)
         elif row.resource == "memory":
-            requests = int(row.avg)
-            limits = int(2 * row.avg)
+            continue
+            # Memory limits causes rsync to fail often
+            #requests = int(row.avg)
+            #limits = int(2 * row.avg)
         else:
             print(f"Unknown resource {row.resource}")
             continue
