@@ -1,9 +1,9 @@
+#!/bin/bash
 if [[ $# -ne 1 ]]; then
   echo "Usage: $0 <expid>"
   exit 1
 fi
 kEXPID=$1
-kDIR="resources"
 
 ./export_resource_metrics.sh || exit 1
 
