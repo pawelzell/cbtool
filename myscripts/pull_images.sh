@@ -13,7 +13,8 @@ for IMAGE in $@; do
 		IMAGE="ycsb"
 	fi
 	if [[ $IMAGE == "linpack" ]]; then
-		sudo docker load < linpack.tar
+		sudo docker pull pawelzell/ubuntu_cb_linpack
+		sudo docker tag pawelzell/ubuntu_cb_linpack ibmcb/ubuntu_cb_linpack
 	else
 		IMAGE="ibmcb/ubuntu_cb_${IMAGE}"
 		IMAGE_FULL="${IMAGE}${kVER_SUF}"
