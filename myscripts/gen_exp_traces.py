@@ -1,15 +1,18 @@
+import argparse
+import random
 import sys
 import os
 import pandas as pd
 resource_data_csv = "resource.csv"
 hadoop_slave_no = 2
+max_hadoop_count = 7
 
 resource_constraints = "typealter {type} {role}_{resource}_{constraint}={value}\n"
 hadoop_sut = "typealter hadoop sut=hadoopmaster->{}_x_hadoopslave\n"
 
 prefix = \
 """cldattach kub TESTKUB
-expid {}{}
+expid {}
 vmcattach all
 vmclist
 
@@ -23,7 +26,7 @@ instance = \
 """
 aiattach {}
 vmlist
-waitfor {}
+waitfor {}m
 """
 
 suffix = \
@@ -32,6 +35,10 @@ monextract all
 clddetach
 exit
 """
+
+def is_mixed_tasks_list_valid(tasks):
+    hadoop_count = sum([1 for task in tasks if task == "hadoop"])
+    return hadoop_count <= max_hadoop_count
 
 def get_resource_constraints():
     results = []
@@ -54,53 +61,83 @@ def get_resource_constraints():
             results.append(result)
     return results
 
-
-def set_hadoop_sut(f, x, y):
-    t = None
-    if x.startswith("hadoop"):
-        t = x
-    elif y.startswith("hadoop"):
-        t = y
-    else: 
-        return
-    no_raw = t[len("hadoop"):] 
-    if not no_raw:
-        no = 1
-    else:
-        no = int(no_raw)
-    f.write(hadoop_sut.format(no))
-
-def gen_exp(x, y, nr, task_count, constraints, interval="20m"):
-    basepath="../traces"
-    if x == y:
-        basename=f"{x}"
-    else:
-        basename=f"{x}_{y}"
-    filename = os.path.join(basepath, basename)
-    print(f"will generate {filename} {x} {y} {nr}")
+def gen_exp(expid, filename, description, tasks, interval, constraints):
     with open(filename, "w") as f:
-        f.write(f"# {x} {y} {task_count}\n")
-        f.write(prefix.format(nr, basename))
+        f.write(description)
+        f.write(prefix.format(expid))
         f.write(hadoop_sut.format(hadoop_slave_no))
         for c in constraints:
             f.write(resource_constraints.format(**c))
-        f.write(instance.format(x, interval))
-        for _ in range(task_count-1):
-            f.write(instance.format(y, interval))
+        for task in tasks:
+            f.write(instance.format(task, interval))
         f.write(suffix)
-    return nr+1
+
+def gen_mixed_tasks_list(types, task_count, max_tries=100):
+    for _ in range(max_tries):
+        tasks = []
+        if min(len(types), task_count) > 2:
+            tasks += random.sample(types, 3)
+        tasks += random.choices(types, k=task_count - len(tasks))
+        if is_mixed_tasks_list_valid(tasks):
+            return tasks
+    raise ValueError(f"Tried to sample a tasks list for mixed experiment and failed {max_tries} times")
+
+def gen_exp_mixed(types, no, task_count, interval, constraints):
+    basepath="../traces"
+    basename = expid = f"{no}mixed"
+    filename = os.path.join(basepath, basename)
+    tasks = gen_mixed_tasks_list(types, task_count)
+    description = f'# mixed {",".join(tasks)}\n'
+    print(f"will generate {filename}")
+    gen_exp(expid, filename, description, tasks, interval, constraints)
+
+def gen_exp_linear(x, y, no, task_count, interval, constraints):
+    basepath="../traces"
+    if x == y:
+        basename = f"{x}"
+    else:
+        basename = f"{x}_{y}"
+    filename = os.path.join(basepath, basename)
+    expid = f"{no}{basename}"
+    description = f"# linear {x} {y} {task_count}\n"
+    tasks = [x] + [y] * (task_count-1)
+    print(f"will generate {filename} {x} {y} {no}")
+    gen_exp(expid, filename, description, tasks, interval, constraints)
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Generate CBTOOL experiments traces. "\
+        "Generated experiment descriptions are saved to ../traces.")
+    parser.add_argument("no", type=int, help="Each experiment has to have unique id. " \
+        "Generated experiment ids have form '<order number><exp_type>' for consecutive "
+        "order numbers. This parameter specifiy the order number to start from.")
+    parser.add_argument("task_count", metavar="K", type=int, help="Number of tasks deployed in a single experiment.")
+    parser.add_argument(dest="types", nargs="+", type=str, help="List of task types. Each task type "
+        "has to be valid CBTOOL application instance type e.g. redis_ycsb, hadoop, linpack")
+    parser.add_argument("-m", dest="mode", default="linear", choices=["linear", "mixed"], help="Type of " \
+        "generated experiments (default linear). 'linear' - deploys one task of type x and (N-1) tasks of type y." \
+        "`mixed` - deploys N tasks of random types, but at least from three different types if possible.")
+    parser.add_argument("-i", metavar="I", dest="interval", type=int, default=20, help="Number of minutes" \
+        " to wait between deployment of two consecutive tasks.")
+    parser.add_argument("-n", metavar="N", dest="experiment_count", type=int, default=10, help="If mixed mode " \
+        "is selected, generates N different experiments.")
+    return parser.parse_args()
 
 def main():
-    if len(sys.argv) < 3:
-        print(f"usage: {sys.argv[0]} <expid_nr> <max task count> <types>")
-        return 1
-
-    nr = int(sys.argv[1])
-    task_count = int(sys.argv[2])
+    args = parse_args()
     constraints = get_resource_constraints()
-    for x in sys.argv[3:]:
-        for y in sys.argv[3:]:
-            nr = gen_exp(x, y, nr, task_count, constraints)
+    no = args.no
+    if args.mode == "linear":
+        for x in args.types:
+            for y in args.types:
+                gen_exp_linear(x, y, no, args.task_count, args.interval, constraints)
+                no += 1
+    elif args.mode == "mixed":
+        for _ in range(args.experiment_count):
+            gen_exp_mixed(args.types, no, args.task_count, args.interval, constraints)
+            no += 1
+    else:
+        print(f"Unsupported mode {args.mode}")
+        return 1
     print(f"Hadoop slave number set to {hadoop_slave_no}")
 
 if __name__ == "__main__":
