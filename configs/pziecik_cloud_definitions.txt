@@ -154,13 +154,13 @@ HADOOP_JAVA_HOME = /usr/lib/jvm/java-8-openjdk-amd64/jre/
 OPEN_DAYTRADER_JAVA_HOME = /usr/lib/jvm/jdk1.7.0_80/jre
 
 
-[VMC_DEFAULTS : CLOUDOPTION_MYKUB]
-CUSTOM_SCHEDULER = type-aware-scheduler
+#[VMC_DEFAULTS : CLOUDOPTION_MYKUB]
+#CUSTOM_SCHEDULER = type-aware-scheduler
 
-# [VM_DEFAULTS : CLOUDOPTION_MYKUB]
+[VM_DEFAULTS : CLOUDOPTION_MYKUB]
+PORTS_BASE = 10000
 # UPDATE_ATTEMPTS = 600             # Pulling hadoop container may take 10min
 # IMAGE_PREFIX = pawelzell/ubuntu_
-# PORTS_BASE = 30000
 # [AI_DEFAULTS : CLOUDOPTION_MYKUB]
 # UPDATE_ATTEMPTS = 600
 #-------------------------------------------------------------------------------
@@ -192,8 +192,8 @@ USAGE = shared
 USAGE = shared
 
 [API_DEFAULTS]
-PORT = 7070
+PORT = 7072
 
 [GUI_DEFAULTS]
 BRANDING = favicon.ico,20,http://localhost
-PORT = 8081
+PORT = 8082

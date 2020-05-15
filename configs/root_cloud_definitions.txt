@@ -1,10 +1,10 @@
 [USER-DEFINED]
 # Variable $IP_AUTO attempts to auto-discover IP address
-MANAGER_IP = 172.17.0.1
+MANAGER_IP = 10.9.99.2 
 MAIN_UPDATE_FREQUENCY = 5
-MAIN_UPDATE_ATTEMPTS = 36
+MAIN_UPDATE_ATTEMPTS = 500 # changed from 36
 MAIN_NOTIFICATION = $False
-MAIN_ATTEMPTS = 3
+MAIN_ATTEMPTS = 3 # changed from 3
 MAIN_TIMEOUT = 240
 # Variable $USER auto-selects current username
 MAIN_USERNAME = $USER_AUTO
@@ -139,22 +139,30 @@ PCM_LOGIN = cbuser                                                              
 #-------------------------------------------------------------------------------
 # Kubernetes (KUB) requires the following parameters
 [USER-DEFINED : CLOUDOPTION_MYKUB ]
-KUB_ACCESS = /home/pawel/.kube/kind-config-kind                                                                                           # The full path to the kubernetes configuration file
+KUB_ACCESS = ~/.kube/config                                                                                           # The full path to the kubernetes configuration file
 KUB_CREDENTIALS = NOTUSED                                                                                             # Currently not used
-KUB_INITIAL_VMCS = none                                                                                             # This really does not matter, could be anything
+KUB_INITIAL_VMCS = none                                                                                              # This really does not matter, could be anything
 KUB_NETNAME = private                                                                                                 # Currently not used
 KUB_SSH_KEY_NAME = cbtool_rsa                                                                                         # Name of the private/public key pair - locally available - used to login on the VMs
 KUB_KEY_NAME = cbtool_rsa                                                                                             # Name of the private key present in the cloud to be injected on VMs
 KUB_LOGIN = cbuser                                                                                                    # The username that logins on the VMs
-KUB_NAMESPACE = default  #[AI_DEFAULTS : KUB_CLOUDCONFIG]
+KUB_NAMESPACE = default
+
+[AI_TEMPLATES : CLOUDOPTION_MYKUB]
+GIRAPH_JAVA_HOME = /usr/lib/jvm/java-8-openjdk-amd64/jre/
+HADOOP_JAVA_HOME = /usr/lib/jvm/java-8-openjdk-amd64/jre/
+OPEN_DAYTRADER_JAVA_HOME = /usr/lib/jvm/jdk1.7.0_80/jre
+
+
+#[VMC_DEFAULTS : CLOUDOPTION_MYKUB]
+#CUSTOM_SCHEDULER = type-aware-scheduler
+
 [VM_DEFAULTS : CLOUDOPTION_MYKUB]
-UPDATE_ATTEMPTS = 600             # Pulling hadoop container may take 10min
-#IMAGE_PREFIX = pawelzell/ubuntu_
-#PORTS_BASE = 30000
-[AI_DEFAULTS : CLOUDOPTION_MYKUB]
-UPDATE_ATTEMPTS = 600
-[VMC_DEFAULTS : CLOUDOPTION_MYKUB]
-CUSTOM_SCHEDULER = type-aware-scheduler
+PORTS_BASE = 10000
+# UPDATE_ATTEMPTS = 600             # Pulling hadoop container may take 10min
+# IMAGE_PREFIX = pawelzell/ubuntu_
+# [AI_DEFAULTS : CLOUDOPTION_MYKUB]
+# UPDATE_ATTEMPTS = 600
 #-------------------------------------------------------------------------------
 # Azure Service Manager (AS) requires the following parameters (via LibCloud)
 [USER-DEFINED : CLOUDOPTION_MYAS ]
@@ -184,8 +192,8 @@ USAGE = shared
 USAGE = shared
 
 [API_DEFAULTS]
-PORT = 7070
+PORT = 7072
 
 [GUI_DEFAULTS]
 BRANDING = favicon.ico,20,http://localhost
-PORT = 8080
+PORT = 8082
