@@ -192,8 +192,8 @@ def main():
         max_hadoop_count = args.max_hadoop_count
 
     if args.mode == "linear":
-        for x in args.types:
-            for y in args.types:
+        for x in types:
+            for y in types:
                 gen_exp_linear(x, y, no, args.task_count, args.interval, constraints)
                 no += 1
     elif args.mode == "mixed":
