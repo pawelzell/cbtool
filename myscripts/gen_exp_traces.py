@@ -36,6 +36,8 @@ vmlist
 waitfor {}m
 """
 
+description_line = "# {} {} {}\n"
+
 instance_async = \
 """
 aiattach {} async
@@ -81,9 +83,9 @@ def get_resource_constraints():
     return results
 
 
-def gen_exp(expid, filename, description, tasks, interval, constraints, async=False):
+def gen_exp(expid, filename, tasks, interval, constraints, exp_type, exp_summary, async=False):
     with open(filename, "w") as f:
-        f.write(description)
+        f.write(description_line.format(exp_type, expid, exp_summary))
         f.write(prefix.format(expid))
         f.write(hadoop_sut.format(hadoop_slave_no))
         for c in constraints:
@@ -117,9 +119,9 @@ def gen_exp_mixed(types, no, task_count, interval, constraints):
     basename = expid = f"{no}mixed"
     filename = os.path.join(basepath, basename)
     tasks = gen_mixed_tasks_list(types, task_count)
-    description = f'# mixed {",".join(tasks)}\n'
+    exp_summary = ",".join(tasks)
     print(f"will generate {filename}")
-    gen_exp(expid, filename, description, tasks, interval, constraints)
+    gen_exp(expid, filename, tasks, interval, constraints, "mixed", exp_summary)
 
 
 def gen_exp_linear(x, y, no, task_count, interval, constraints):
@@ -130,10 +132,10 @@ def gen_exp_linear(x, y, no, task_count, interval, constraints):
         basename = f"{x}_{y}"
     filename = os.path.join(basepath, basename)
     expid = f"{no}{basename}"
-    description = f"# linear {x} {y} {task_count}\n"
+    exp_summary = f"{x},{y},{task_count}"
     tasks = [x] + [y] * (task_count-1)
-    print(f"will generate {filename} {x} {y} {no}")
-    gen_exp(expid, filename, description, tasks, interval, constraints)
+    print(f"will generate {filename} {exp_summary}")
+    gen_exp(expid, filename, tasks, interval, constraints, "linear", exp_summary)
 
 
 def gen_exp_scheduler(types, no, task_count, interval, constraints):
@@ -142,10 +144,10 @@ def gen_exp_scheduler(types, no, task_count, interval, constraints):
     for i in range(scheduler_exp_shuffles_count):
         random.shuffle(tasks)
         basename = expid = f"{no}scheduler{i}"
-        description = f'# scheduler {",".join(tasks)}\n'
+        exp_summary = ",".join(tasks)
         filename = os.path.join(basepath, basename)
         print(f"will generate {filename}")
-        gen_exp(expid, filename, description, tasks, interval, constraints, async=True)
+        gen_exp(expid, filename, tasks, interval, constraints, "scheduler", exp_summary, async=True)
 
 
 def parse_args():
