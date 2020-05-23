@@ -25,7 +25,6 @@ def getPerfAggregateForMetric(expid, df, ai_no, tasks, metric, d, quantiles=[0.2
 
 def getPerfAggregateForAIAndTaskNumber(expid, df, ai_no, tasks, ts):
     d = {"expid": expid.expid, "t1": expid.t1, "t2": expid.t2, "ai_no": ai_no + 1, "tasks": tasks + 1}
-    # d = {"expid": expid.expid, "ai_no": ai_no + 1, "tasks": tasks + 1}
     ai_name = f"ai_{ai_no+1}"
     ai_type = expid.t1 if ai_no == 0 else expid.t2
     df = df.loc[dfInterval(df, *ts) & (df["ai_name"] == ai_name), :]
