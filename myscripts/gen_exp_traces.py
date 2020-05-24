@@ -24,6 +24,17 @@ typealter wrk load_level=1
 typealter wrk load_duration=1
 """
 
+custom_scheduler_options = \
+"""
+typealter redis_ycsb redis_custom_scheduler=type-aware-scheduler
+typealter redis_ycsb ycsb_custom_scheduler=type-aware-scheduler
+typealter wrk wrk_custom_scheduler=type-aware-scheduler
+typealter wrk apache_custom_scheduler=type-aware-scheduler
+typealter hadoop hadoopmaster_custom_scheduler=type-aware-scheduler
+typealter hadoop hadoopslave_custom_scheduler=type-aware-scheduler
+typealter linpack linpack_custom_scheduler=type-aware-scheduler
+"""
+
 wait_cmd = \
 """
 waitfor {}m
@@ -83,10 +94,13 @@ def get_resource_constraints():
     return results
 
 
-def gen_exp(expid, filename, tasks, interval, constraints, exp_type, exp_summary, async=False):
+def gen_exp(expid, filename, tasks, interval, constraints, exp_type, exp_summary,
+            async=False, custom_scheduler=True):
     with open(filename, "w") as f:
         f.write(description_line.format(exp_type, expid, exp_summary))
         f.write(prefix.format(expid))
+        if custom_scheduler:
+            f.write(custom_scheduler_options)
         f.write(hadoop_sut.format(hadoop_slave_no))
         for c in constraints:
             f.write(resource_constraints.format(**c))
@@ -143,11 +157,13 @@ def gen_exp_scheduler(types, no, task_count, interval, constraints):
     tasks = gen_mixed_tasks_list(types, task_count)
     for i in range(scheduler_exp_shuffles_count):
         random.shuffle(tasks)
-        basename = expid = f"{no}scheduler{i}"
-        exp_summary = ",".join(tasks)
-        filename = os.path.join(basepath, basename)
-        print(f"will generate {filename}")
-        gen_exp(expid, filename, tasks, interval, constraints, "scheduler", exp_summary, async=True)
+        for custom_scheduler in ["", "_custom"]:
+            basename = expid = f"{no}scheduler{i}{custom_scheduler}"
+            exp_summary = ",".join(tasks)
+            filename = os.path.join(basepath, basename)
+            print(f"will generate {filename}")
+            gen_exp(expid, filename, tasks, interval, constraints, "scheduler",
+                    exp_summary, async=True, custom_scheduler=bool(custom_scheduler))
 
 
 def parse_args():
