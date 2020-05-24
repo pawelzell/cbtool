@@ -12,6 +12,7 @@ for kEXPFILE in $@; do
     echo "Pull image $kIMAGE"
     ./pull_images.sh $kIMAGE
   done
+  ./export_config_to_scheduler.sh ../$kEXPFILE
   cd .. || exit 1
   echo "Will run cbtool for expfile: $kEXPFILE"
   kEXPID=`awk '/^expid/ {print}' $kEXPFILE | sed 's/expid //'`
