@@ -1052,8 +1052,8 @@ class KubCmds(CommonCloudFunctions) :
                 cbdebug("Setting node name from obj_attr_list to: " + _node_name)
             else :
                 _taint = _vmc_attr_list["pool"]
-            if "custom_scheduler" in _vmc_attr_list:
-                _custom_scheduler = _vmc_attr_list["custom_scheduler"]
+            if "custom_scheduler" in obj_attr_list:
+                _custom_scheduler = obj_attr_list["custom_scheduler"]
 
             self.determine_instance_name(obj_attr_list)
             obj_attr_list["cloud_vm_name"] = obj_attr_list["cloud_vm_name"].lower()

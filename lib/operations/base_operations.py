@@ -2099,6 +2099,7 @@ class BaseObjectOperations :
             for constraint in ["requests", "limits"]:
                 yield "{}_{}".format(resource, constraint)
         yield "node_name"
+        yield "custom_scheduler"
 
     @trace
     def propagate_ai_attributes_to_vm(self, vm_role, cloud_ips, obj_attr_list) :
