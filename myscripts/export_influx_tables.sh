@@ -1,7 +1,7 @@
 kDB='type_aware_scheduler'
 
 # Export all metrics for pods from default namespace or for whole node
-kREG="^metric\/(pod\/default\/|node)[[:graph:]]{,}$"
+kREG="^metric\/(pod\/default\/|node|os)[[:graph:]]{,}$"
 TABLES=$(influx -database $kDB -execute 'SHOW MEASUREMENTS')
 
 rm *.csv
