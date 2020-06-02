@@ -1,19 +1,24 @@
 #!/bin/bash
-if [[ ( $# -lt 2 ) || (( $1 != "-files" ) && ( $1 != "-dir" )) ]]; then
+if [[ (( $# -lt 2 ) || ( $1 != "-files" )) && (( $# -ne 3 ) || ( $1 != "-scheduler" )) ]]; then
   echo "Usage: $0 -files <expfiles from ../traces dir>"
-  echo "Usage: $0 -dir <dir with expfiles>"
+  echo "Usage: $0 -scheduler <startid> <endid>"
   exit 1
 fi
 
+kEXPDIR="../traces"
 if [[ $1 == "-files" ]]; then
-  kEXPDIR="../traces"
   kEXPFILES=${@:2}
 else
-  kEXPDIR=$2
-  kEXPFILES=`ls "$2"`
+  kEXPFILES=()
+  for i in $(eval echo {$2..$3}); do
+    for j in {0..0}; do
+        kEXPFILES+=("${i}scheduler${j}")
+        kEXPFILES+=("${i}scheduler${j}_custom")
+    done
+  done
 fi
 
-for kEXPFILE in ${kEXPFILES}; do
+for kEXPFILE in ${kEXPFILES[@]}; do
   kEXPFILE="myscripts/$kEXPDIR/$kEXPFILE"
   ./export_config_to_scheduler.sh ../${kEXPFILE}
   ./clear_influxdb.sh
