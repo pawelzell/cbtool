@@ -1042,7 +1042,7 @@ class KubCmds(CommonCloudFunctions) :
             _taint = False
             _node_name = False
             _custom_scheduler = False
-            _pod_affinity = "podAntiAffinity"
+            _schedule_ai_same_node = False
 
             _vmc_attr_list = self.osci.get_object(obj_attr_list["cloud_name"], "VMC", False, obj_attr_list["vmc"], False)
             cbdebug("Pool is: " + _vmc_attr_list["pool"])
@@ -1055,8 +1055,8 @@ class KubCmds(CommonCloudFunctions) :
                 _taint = _vmc_attr_list["pool"]
             if "custom_scheduler" in obj_attr_list:
                 _custom_scheduler = obj_attr_list["custom_scheduler"]
-            if "pod_affinity" in _vmc_attr_list and _vmc_attr_list["pod_affinity"]:
-                _pod_affinity = "podAffinity"
+            if "schedule_ai_same_node" in _vmc_attr_list:
+                _schedule_ai_same_node = True
 
             self.determine_instance_name(obj_attr_list)
             obj_attr_list["cloud_vm_name"] = obj_attr_list["cloud_vm_name"].lower()
@@ -1151,9 +1151,30 @@ class KubCmds(CommonCloudFunctions) :
                 if _custom_scheduler:
                     cbdebug("Using custom scheduler: " + str(_custom_scheduler) + " while creating pod.")
                     _obj["spec"]["schedulerName"] = _custom_scheduler
-                if not _taint and not _node_name :
+                if _schedule_ai_same_node:
+                    cbdebug("Schedule pods from one ai on the same node")
                     _obj["spec"]["affinity"] = {
-                                         _pod_affinity : {
+                        "podAffinity": {
+                            "preferredDuringSchedulingIgnoredDuringExecution": [
+                                {"podAffinityTerm":
+                                    {"labelSelector": {
+                                        "matchExpressions": [
+                                            {"key": "ai",
+                                             "operator": "In",
+                                             "values": [obj_attr_list["ai"]]
+                                             }
+                                        ]
+                                    },
+                                    "topologyKey": "kubernetes.io/hostname"
+                                    },
+                                    "weight": 1
+                                }
+                            ]
+                        }
+                    }
+                elif not _taint and not _node_name :
+                    _obj["spec"]["affinity"] = {
+                                         "podAntiAffinity" : {
                                            "requiredDuringSchedulingIgnoredDuringExecution" : [
                                              { "labelSelector": {
                                                  "matchExpressions": [
