@@ -1155,20 +1155,17 @@ class KubCmds(CommonCloudFunctions) :
                     cbdebug("Schedule pods from one ai on the same node")
                     _obj["spec"]["affinity"] = {
                         "podAffinity": {
-                            "preferredDuringSchedulingIgnoredDuringExecution": [
-                                {"podAffinityTerm":
-                                    {"labelSelector": {
-                                        "matchExpressions": [
-                                            {"key": "ai",
-                                             "operator": "In",
-                                             "values": [obj_attr_list["ai"]]
-                                             }
-                                        ]
-                                    },
-                                    "topologyKey": "kubernetes.io/hostname"
-                                    },
-                                    "weight": 1
-                                }
+                            "requiredDuringSchedulingIgnoredDuringExecution" : [
+                                {"labelSelector": {
+                                    "matchExpressions": [
+                                        {"key": "ai",
+                                         "operator": "In",
+                                         "values": [obj_attr_list["ai"]]
+                                         }
+                                    ]
+                                },
+                                "topologyKey": "kubernetes.io/hostname"
+                                },
                             ]
                         }
                     }
