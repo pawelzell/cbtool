@@ -24,16 +24,13 @@ typealter wrk load_level=1
 typealter wrk load_duration=1
 """
 
-custom_scheduler_options = \
+ai_type_to_role = {"redis_ycsb": ("ycsb", "redis"), "hadoop": ("hadoopmaster", "hadoopslave"),
+                   "linpack": ("linpack",), "wrk": ("wrk", "apache"), "filebench": ("filebench",),
+                   "unixbench": ("unixbench",), "netperf": ("netclient", "netserver")}
+
+use_custom_scheduler = \
 """
-typealter redis_ycsb redis_custom_scheduler=type-aware-scheduler
-typealter redis_ycsb ycsb_custom_scheduler=type-aware-scheduler
-typealter wrk wrk_custom_scheduler=type-aware-scheduler
-typealter wrk apache_custom_scheduler=type-aware-scheduler
-typealter hadoop hadoopmaster_custom_scheduler=type-aware-scheduler
-typealter hadoop hadoopslave_custom_scheduler=type-aware-scheduler
-typealter linpack linpack_custom_scheduler=type-aware-scheduler
-"""
+typealter {} {}_custom_scheduler={}"""
 
 wait_cmd = \
 """
@@ -96,12 +93,14 @@ def get_resource_constraints():
 
 
 def gen_exp(expid, filename, tasks, interval, constraints, exp_type, exp_summary,
-            async=False, custom_scheduler=True):
+            async=False, custom_scheduler=None):
     with open(filename, "w") as f:
         f.write(description_line.format(exp_type, expid, exp_summary))
         f.write(prefix.format(expid))
-        if custom_scheduler:
-            f.write(custom_scheduler_options)
+        if custom_scheduler is not None:
+            for t, roles in ai_type_to_role.items():
+                for role in roles:
+                    f.write(use_custom_scheduler.format(t, role, custom_scheduler))
         f.write(hadoop_sut.format(hadoop_slave_no))
         for c in constraints:
             f.write(resource_constraints.format(**c))
@@ -158,13 +157,13 @@ def gen_exp_scheduler(types, no, task_count, interval, constraints):
     tasks = gen_mixed_tasks_list(types, task_count)
     for i in range(scheduler_exp_shuffles_count):
         random.shuffle(tasks)
-        for custom_scheduler in ["", "_custom"]:
-            basename = expid = f"{no}scheduler{i}{custom_scheduler}"
+        for custom_scheduler, suffix in [("random-scheduler", "_random"), ("type-aware-scheduler", "_custom")]:
+            basename = expid = f"{no}scheduler{i}{suffix}"
             exp_summary = ",".join(tasks)
             filename = os.path.join(basepath, basename)
             print(f"will generate {filename}")
             gen_exp(expid, filename, tasks, interval, constraints, "scheduler",
-                    exp_summary, async=True, custom_scheduler=bool(custom_scheduler))
+                    exp_summary, async=True, custom_scheduler=custom_scheduler)
 
 
 def parse_args():
