@@ -7,7 +7,7 @@ resource_data_csv = "resource.csv"
 types_default = ["redis_ycsb", "wrk", "hadoop", "linpack"]
 hadoop_slave_no = 2
 max_hadoop_count = 15
-scheduler_exp_shuffles_count = 5
+scheduler_exp_shuffles_count = 3
 
 resource_constraints = "typealter {type} {role}_{resource}_{constraint}={value}\n"
 hadoop_sut = "typealter hadoop sut=hadoopmaster->{}_x_hadoopslave\n"
@@ -80,10 +80,11 @@ def get_resource_constraints():
             requests = "1"
             limits = int(2 * row.avg)
         elif row.resource == "memory":
-            continue
-            # Memory limits causes rsync to fail often
-            #requests = int(row.avg)
-            #limits = int(2 * row.avg)
+            if row.type != "hadoop":
+                # Set memory constraints only for hadoop
+                continue
+            requests = int(row.avg)
+            limits = int(2 * row.avg)
         else:
             print(f"Unknown resource {row.resource}")
             continue
