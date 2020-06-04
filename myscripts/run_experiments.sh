@@ -12,7 +12,7 @@ else
   kEXPFILES=()
   for i in $(eval echo {$2..$3}); do
     for j in {0..0}; do
-        kEXPFILES+=("${i}scheduler${j}_random")
+        kEXPFILES+=("${i}scheduler${j}_round_robin")
         kEXPFILES+=("${i}scheduler${j}_custom")
     done
   done
