@@ -13,6 +13,7 @@ else
   for i in $(eval echo {$2..$3}); do
     for j in {0..0}; do
         kEXPFILES+=("${i}scheduler${j}_round_robin")
+        #kEXPFILES+=("${i}scheduler${j}_random")
         kEXPFILES+=("${i}scheduler${j}_custom")
     done
   done
@@ -20,7 +21,8 @@ fi
 
 for kEXPFILE in ${kEXPFILES[@]}; do
   kEXPFILE="myscripts/$kEXPDIR/$kEXPFILE"
-  ./export_config_to_scheduler.sh ../${kEXPFILE}
+  ./export_config_to_scheduler.sh ../${kEXPFILE} random-scheduler
+  ./export_config_to_scheduler.sh ../${kEXPFILE} type-aware-scheduler
   ./clear_influxdb.sh
   kIMAGES=`awk '/^aiattach/ {print $2}' ../${kEXPFILE} | sort -u`
   for kIMAGE in $kIMAGES; do

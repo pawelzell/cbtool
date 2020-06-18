@@ -7,7 +7,7 @@ resource_data_csv = "resource.csv"
 types_default = ["redis_ycsb", "wrk", "hadoop", "linpack"]
 hadoop_slave_no = 2
 max_hadoop_count = 15
-scheduler_exp_shuffles_count = 3
+scheduler_exp_shuffles_count = 1
 
 resource_constraints = "typealter {type} {role}_{resource}_{constraint}={value}\n"
 hadoop_sut = "typealter hadoop sut=hadoopmaster->{}_x_hadoopslave\n"
@@ -28,14 +28,9 @@ ai_type_to_role = {"redis_ycsb": ("ycsb", "redis"), "hadoop": ("hadoopmaster", "
                    "linpack": ("linpack",), "wrk": ("wrk", "apache"), "filebench": ("filebench",),
                    "unixbench": ("unixbench",), "netperf": ("netclient", "netserver")}
 
-use_custom_scheduler = \
-"""
-typealter {} {}_custom_scheduler={}"""
+use_custom_scheduler = "typealter {} {}_custom_scheduler={}\n"
 
-wait_cmd = \
-"""
-waitfor {}m
-"""
+wait_cmd = "waitfor {}m\n"
 
 instance = \
 """
@@ -46,15 +41,9 @@ waitfor {}m
 
 description_line = "# {} {} {}\n"
 
-instance_async = \
-"""
-aiattach {} async
-"""
+attach_instance = "aiattach {} {}\n"
 
-wait_for_all_ai_arrival = \
-"""
-waituntil AI ARRIVED={} increasing 20 7200
-"""
+wait_for_all_ai_arrival = "waituntil AI ARRIVED={} increasing 20 72000\n"
 
 suffix = \
 """
@@ -93,7 +82,7 @@ def get_resource_constraints():
 
 
 def gen_exp(expid, filename, tasks, interval, constraints, exp_type, exp_summary,
-            async=False, custom_scheduler=None):
+            async=False, custom_scheduler=None, end_interval=None):
     with open(filename, "w") as f:
         f.write(description_line.format(exp_type, expid, exp_summary))
         f.write(prefix.format(expid))
@@ -104,18 +93,15 @@ def gen_exp(expid, filename, tasks, interval, constraints, exp_type, exp_summary
         f.write(hadoop_sut.format(hadoop_slave_no))
         for c in constraints:
             f.write(resource_constraints.format(**c))
-        if async:
-            for task in tasks:
-                f.write(instance_async.format(task))
-            f.write(wait_for_all_ai_arrival.format(len(tasks)))
+        for task in tasks:
+            f.write(attach_instance.format(task, "async" if async else ""))
             f.write(wait_cmd.format(interval))
-        else:
-            for task in tasks:
-                f.write(instance.format(task, interval))
+        if async:
+            f.write(wait_for_all_ai_arrival.format(len(tasks)))
+        if end_interval is not None:
+            f.write(wait_cmd.format(end_interval))
         f.write(suffix)
 
-
-# Change interval - no interval in between tasks
 
 def gen_mixed_tasks_list(types, task_count, max_tries=100):
     for _ in range(max_tries):
@@ -157,13 +143,13 @@ def gen_exp_scheduler(types, no, task_count, interval, constraints):
     tasks = gen_mixed_tasks_list(types, task_count)
     for i in range(scheduler_exp_shuffles_count):
         random.shuffle(tasks)
-        for custom_scheduler, suffix in [("round-robin-scheduler", "_round_robin"), ("type-aware-scheduler", "_custom")]:
+        for custom_scheduler, suffix in [("round-robin-scheduler", "_round_robin"), ("random-scheduler", "_random"), ("type-aware-scheduler", "_custom")]:
             basename = expid = f"{no}scheduler{i}{suffix}"
             exp_summary = ",".join(tasks)
             filename = os.path.join(basepath, basename)
             print(f"will generate {filename}")
-            gen_exp(expid, filename, tasks, interval, constraints, "scheduler",
-                    exp_summary, async=True, custom_scheduler=custom_scheduler)
+            gen_exp(expid, filename, tasks, 0, constraints, "scheduler",
+                    exp_summary, async=False, custom_scheduler=custom_scheduler, end_interval=interval)
 
 
 def parse_args():
