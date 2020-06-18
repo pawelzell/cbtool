@@ -1,6 +1,12 @@
+[METRICSTORE]
+PORT = 27018
+
+[OBJECTSTORE]
+PORT = 6380
+
 [USER-DEFINED]
 # Variable $IP_AUTO attempts to auto-discover IP address
-MANAGER_IP = 10.9.99.2 
+MANAGER_IP = 10.2.1.91
 MAIN_UPDATE_FREQUENCY = 5
 MAIN_UPDATE_ATTEMPTS = 500 # changed from 36
 MAIN_NOTIFICATION = $False
@@ -152,15 +158,14 @@ KUB_NAMESPACE = default
 GIRAPH_JAVA_HOME = /usr/lib/jvm/java-8-openjdk-amd64/jre/
 HADOOP_JAVA_HOME = /usr/lib/jvm/java-8-openjdk-amd64/jre/
 OPEN_DAYTRADER_JAVA_HOME = /usr/lib/jvm/jdk1.7.0_80/jre
-
-
-#[VMC_DEFAULTS : CLOUDOPTION_MYKUB]
-#CUSTOM_SCHEDULER = type-aware-scheduler
+ABSTRACTION = deployment
 
 [VM_DEFAULTS : CLOUDOPTION_MYKUB]
+ABSTRACTION = deployment
 PORTS_BASE = 10000
+IMAGE_PREFIX = pawelzell/ubuntu_
 # UPDATE_ATTEMPTS = 600             # Pulling hadoop container may take 10min
-# IMAGE_PREFIX = pawelzell/ubuntu_
+
 # [AI_DEFAULTS : CLOUDOPTION_MYKUB]
 # UPDATE_ATTEMPTS = 600
 #-------------------------------------------------------------------------------

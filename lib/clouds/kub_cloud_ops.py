@@ -1210,6 +1210,7 @@ class KubCmds(CommonCloudFunctions) :
                                                 "metadata": { "labels": { "app": obj_attr_list["cloud_vm_name"], \
                                                                           "role": "master", \
                                                                           "tier": "backend", \
+                                                                          "ai": obj_attr_list["ai"], \
                                                                           "creator" : "cbtool" 
                                                                         } 
                                                              },\
@@ -1246,6 +1247,7 @@ class KubCmds(CommonCloudFunctions) :
                                                 "metadata": { "labels": { "app": obj_attr_list["cloud_vm_name"], \
                                                                           "role": "master", \
                                                                           "tier": "backend", \
+                                                                          "ai": obj_attr_list["ai"], \
                                                                           "creator":  "cbtool"
                                                                         } 
                                                              },\
