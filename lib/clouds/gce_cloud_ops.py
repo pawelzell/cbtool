@@ -94,8 +94,6 @@ class GceCmds(CommonCloudFunctions) :
             if _credentials.create_scoped_required():
                 _credentials = _credentials.create_scoped('https://www.googleapis.com/auth/compute')
 
-            self.gceconn = build('compute', 'v1', credentials=_credentials)
-
             _http_conn_id = "common"
             if http_conn_id :
                 _http_conn_id = http_conn_id
@@ -103,7 +101,8 @@ class GceCmds(CommonCloudFunctions) :
             if _http_conn_id not in self.http_conn :
                 self.http_conn[_http_conn_id] = _credentials.authorize(http = httplib2shim.Http())
 
-            _zone_list = self.gceconn.zones().list(project=self.instances_project).execute()["items"]
+            self.gceconn = build('compute', 'v1', http = self.http_conn[http_conn_id])
+            _zone_list = self.gceconn.zones().list(project=self.instances_project).execute(http = self.http_conn[http_conn_id])["items"]
 
             _zone_info = False
             for _idx in range(0,len(_zone_list)) :
@@ -161,7 +160,7 @@ class GceCmds(CommonCloudFunctions) :
             _key_pair_found = self.check_ssh_key(vmc_name, self.determine_key_name(vm_defaults), vm_defaults, False, vmc_name)
             
             if not GceCmds.base_images_checked :
-                _detected_imageids = self.check_images(vmc_name, vm_templates, vmc_name)
+                _detected_imageids = self.check_images(vmc_name, vm_templates, vmc_name, vm_defaults)
 
                 if not (_run_netname_found and _prov_netname_found and _key_pair_found) :
                     _msg = "Check the previous errors, fix it (using GCE's web"
@@ -208,7 +207,7 @@ class GceCmds(CommonCloudFunctions) :
         return _prov_netname_found, _run_netname_found
 
     @trace
-    def check_images(self, vmc_name, vm_templates, http_conn_id) :
+    def check_images(self, vmc_name, vm_templates, http_conn_id, vm_defaults) :
         '''
         TBD
         '''
@@ -240,7 +239,7 @@ class GceCmds(CommonCloudFunctions) :
 
                 _map_id_to_name[_map_name_to_id[_imageid]] = _imageid
 
-        _detected_imageids = self.base_check_images(vmc_name, vm_templates, _registered_imageid_list, _map_id_to_name)
+        _detected_imageids = self.base_check_images(vmc_name, vm_templates, _registered_imageid_list, _map_id_to_name, vm_defaults)
 
         return _detected_imageids
 
@@ -355,7 +354,7 @@ class GceCmds(CommonCloudFunctions) :
             _x, _y, _hostname = self.connect(obj_attr_list["access"], obj_attr_list["credentials"], obj_attr_list["name"], obj_attr_list["name"])
 
             obj_attr_list["cloud_hostname"] = _hostname + "-" + obj_attr_list["name"]
-            obj_attr_list["cloud_ip"] = gethostbyname(_hostname.split('/')[2]) + "-" + obj_attr_list["name"]
+            obj_attr_list["cloud_ip"] = gethostbyname(_hostname.split('/')[2])
             obj_attr_list["arrival"] = int(time())
 
             if str(obj_attr_list["discover_hosts"]).lower() == "true" :

@@ -37,6 +37,15 @@ from lib.auxiliary.data_ops import str2dic, is_number, DataOpsException
 from lib.remote.network_functions import hostname2ip, check_url, NetworkException
 from shared_functions import CldOpsException, CommonCloudFunctions 
 
+# `extensions/v1beta1` is not allowed after k8s 1.16+
+k8s_version = "apps/v1"
+pykube.objects.DaemonSet.version = k8s_version
+pykube.objects.Deployment.version = k8s_version
+pykube.objects.ReplicaSet.version = k8s_version
+pykube.objects.StatefulSet.version = k8s_version
+pykube.objects.PodSecurityPolicy.version = "policy/v1beta1"
+pykube.objects.Ingress.version = "networking.k8s.io/v1beta1" 
+
 class KubCmds(CommonCloudFunctions) :
     catalogs = threading.local()
 
@@ -111,7 +120,7 @@ class KubCmds(CommonCloudFunctions) :
                     else :
                         _kube_config = pykube.KubeConfig.from_file(access)
 
-                    if _context :
+                    if _context and len(_kube_config.doc["clusters"]) > 1 :
                         cbdebug("Setting current context to: " + _context)
                         _kube_config.set_current_context(_context)
 
@@ -257,7 +266,7 @@ class KubCmds(CommonCloudFunctions) :
 #                        vm_templates[_vm_role] = vm_templates[_vm_role].replace(_imageid, _map_name_to_id[_imageid])
 #                        _registered_imageid_list.append(_map_name_to_id[_imageid])
 
-        _detected_imageids = self.base_check_images(vmc_name, vm_templates, _registered_imageid_list, _map_id_to_name)
+        _detected_imageids = self.base_check_images(vmc_name, vm_templates, _registered_imageid_list, _map_id_to_name, vm_defaults)
 
         if not _detected_imageids :
             return _detected_imageids
@@ -613,7 +622,7 @@ class KubCmds(CommonCloudFunctions) :
                 _address = obj_attr_list["k8s_instance"]["status"]["podIP"]
 
                 obj_attr_list["run_cloud_ip"] = _address
-                obj_attr_list["cloud_ip"] = obj_attr_list["run_cloud_ip"] + "_" + obj_attr_list["name"]
+                obj_attr_list["cloud_ip"] = obj_attr_list["run_cloud_ip"]
 
                 if obj_attr_list["netname"] == "public" :
                     service = pykube.Service(KubCmds.catalogs.kubeconn[obj_attr_list["vmc_name"]], { "kind": "Service", "apiVersion": "v1",  "metadata": { "name": obj_attr_list["cloud_vm_name"]}})
@@ -728,7 +737,7 @@ class KubCmds(CommonCloudFunctions) :
                 for _x in _instances :
                     _instances = _x
 
-            if obj_type == "pod" and hasattr(_instances, "obj") :
+            if obj_type == "pod" and hasattr(_instances, "obj") and "nodeName" in _instances.obj["spec"] :
                 obj_attr_list["node"] = _instances.obj["spec"]["nodeName"]
 
             _status = 0
@@ -1040,14 +1049,14 @@ class KubCmds(CommonCloudFunctions) :
 
             _context = False
             _taint = False
-            _node_name = False
             _custom_scheduler = False
             _schedule_ai_same_node = False
+            _node_name_or_label = False
 
             _vmc_attr_list = self.osci.get_object(obj_attr_list["cloud_name"], "VMC", False, obj_attr_list["vmc"], False)
             cbdebug("Pool is: " + _vmc_attr_list["pool"])
             if _vmc_attr_list["pool"].count(",") :
-                _taint, _node_name = _vmc_attr_list["pool"].split(",")
+                _taint, _node_name_or_label = _vmc_attr_list["pool"].split(",")
             elif "node_name" in obj_attr_list:
                 _node_name = obj_attr_list["node_name"]
                 cbdebug("Setting node name from obj_attr_list to: " + _node_name)
@@ -1140,17 +1149,26 @@ class KubCmds(CommonCloudFunctions) :
                 # 1. [default] Anti Affinity (don't place the VMs from the same AI in the same place)
                 #      [USER-DEFINED]
                 #      KUB_INITIAL_VMCS = default # use the default namespace, no taints or node names
-                # 2. Forced placement (_taint and _node_name are set in the INITAL_VMCS, like this:
+                # 2. Forced placement (_taint and _node_name_or_label are set in the INITAL_VMCS, like this:
+                #      [VMC_DEFAULTS]
+                #      K8S_PLACEMENT_OPTION = nodeName
                 #      [USER-DEFINED]
-                #      KUB_INITIAL_VMCS = cluster:taint;nodeName # It's kind of gross. We can make it better later.
-                # 3. Placement decision by a custom scheduler - selected iff custom_scheduler vmc attribute is set
+                #      KUB_INITIAL_VMCS = cluster:taint;nodeName
+                # 3. Labeled placement (_taint and _node_name_or_label is a label instead of a nodeName)
+                #      [VMC_DEFAULTS]
+                #      K8S_PLACEMENT_OPTION = nodeSelector
+                #      [USER-DEFINED]
+                #      KUB_INITIAL_VMCS = cluster:taint;nodeLabelKey=nodeLabelValue
+                #  3. Placement decision by a custom scheduler - selected iff custom_scheduler vmc attribute is set
                 #
                 # The 2nd options requires that you go "taint" the nodes that you want isolated
                 # so that containers from other tenants (or yourself) don't land on in unwanted places.
+                # The 3rd option requires that you go "label" the nodes that you want isolated.
 
                 if _custom_scheduler:
                     cbdebug("Using custom scheduler: " + str(_custom_scheduler) + " while creating pod.")
                     _obj["spec"]["schedulerName"] = _custom_scheduler
+
                 if _schedule_ai_same_node:
                     cbdebug("Schedule pods from one ai on the same node")
                     _obj["spec"]["affinity"] = {
@@ -1169,25 +1187,34 @@ class KubCmds(CommonCloudFunctions) :
                             ]
                         }
                     }
-                elif not _taint and not _node_name :
+                elif _vmc_attr_list["k8s_placement_option"].lower() == "nodeselector" or (not _taint and not _node_name_or_label) :
+                    # If nodeName's are used, we do not want to block scheduling between two component
+                    # roles of the same AI. We only want to do this when using nodeSelectors.
                     _obj["spec"]["affinity"] = {
                                          "podAntiAffinity" : {
-                                           "requiredDuringSchedulingIgnoredDuringExecution" : [
-                                             { "labelSelector": {
-                                                 "matchExpressions": [
-                                                   { "key" : "ai",
-                                                    "operator" : "In",
-                                                    "values" : [obj_attr_list["ai"]]
-                                                   }
-                                                 ]
-                                               },
-                                              "topologyKey" : "kubernetes.io/hostname"
+                                           # Preferred, not required. Still let the containers go through
+                                           # if the number of nodes is small.
+                                           "preferredDuringSchedulingIgnoredDuringExecution" : [
+                                             {
+                                                 "weight" : 100,
+                                                 "podAffinityTerm" : {
+                                                     "labelSelector": {
+                                                         "matchExpressions": [
+                                                           { "key" : "ai",
+                                                            "operator" : "In",
+                                                            "values" : [obj_attr_list["ai"]]
+                                                           }
+                                                         ]
+                                                     },
+                                                     "topologyKey" : "kubernetes.io/hostname"
+                                                 }
                                             }
                                           ]
                                          }
                                       }
-                else :
-                    cbdebug("Using taint: " + str(_taint) + " and node name: " + str(_node_name))
+
+                if _taint or _node_name_or_label :
+                    cbdebug("Using taint: " + str(_taint) + " and node name: " + str(_node_name_or_label))
                     if _taint :
                         _obj["spec"]["tolerations"] = [ {
                                                         "effect" : "NoSchedule",
@@ -1195,11 +1222,15 @@ class KubCmds(CommonCloudFunctions) :
                                                         "operator" : "Exists"
                                                     }
                                                   ]
-                    if _node_name :
-                        _obj["spec"]["nodeName"] = _node_name
+                    if _node_name_or_label :
+                        if _vmc_attr_list["k8s_placement_option"].lower() == "nodename" :
+                            _obj["spec"]["nodeName"] = _node_name_or_label
+                        else :
+                            _nodeSelectorKey, _nodeSelectorValue = _node_name_or_label.split("=")
+                            _obj["spec"]["nodeSelector"] = {_nodeSelectorKey : _nodeSelectorValue}
 
             if obj_attr_list["abstraction"] == "replicaset" :
-                _obj = { "apiVersion": "extensions/v1beta1", \
+                _obj = { "apiVersion": k8s_version, \
                          "kind": "ReplicaSet", \
                          "id": obj_attr_list["cloud_rs_name"], \
                          "metadata": { "name": obj_attr_list["cloud_rs_name"], \
@@ -1236,7 +1267,7 @@ class KubCmds(CommonCloudFunctions) :
                 obj_attr_list["selector"] = "app:" + obj_attr_list["cloud_rs_name"] + ',' + "role:master,tier:backend"
 
             if obj_attr_list["abstraction"] == "deployment" :
-                _obj = { "apiVersion": "extensions/v1beta1", \
+                _obj = { "apiVersion": k8s_version, \
                          "kind": "Deployment", \
                          "id": obj_attr_list["cloud_d_name"], \
                          "metadata": { "name": obj_attr_list["cloud_d_name"], \

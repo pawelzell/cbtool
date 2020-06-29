@@ -30,6 +30,7 @@ import json
 import traceback
 import socket
 
+from copy import deepcopy
 from time import time, sleep
 from uuid import uuid5, UUID, NAMESPACE_DNS
 from socket import gethostbyname
@@ -1018,14 +1019,19 @@ class CommonCloudFunctions:
         return _security_group_found
 
     @trace        
-    def base_check_images(self, vmc_name, vm_templates, registered_imageid_list, map_id_to_name) :
+    def base_check_images(self, vmc_name, vm_templates, registered_imageid_list, map_id_to_name, vm_defaults) :
         '''
         TBD
         '''        
         
         _required_imageid_list = {}
 
-        for _vm_role in vm_templates.keys() :
+        _vm_templates = deepcopy(vm_templates)
+        if str(vm_defaults["nest_containers_enabled"]).lower() == "false" :
+            if "nest_containers_base_image"  in _vm_templates :
+                del _vm_templates["nest_containers_base_image"]
+
+        for _vm_role in _vm_templates.keys() :
             _imageid = str2dic(vm_templates[_vm_role])["imageid1"]
             if self.is_cloud_image_uuid(_imageid) :
                 if _imageid not in _required_imageid_list :
@@ -1161,7 +1167,10 @@ class CommonCloudFunctions:
 
                     line = line.replace("USER", obj_attr_list["username"])
                     line = line.replace("CLOUD_NAME", obj_attr_list["cloud_name"])
-                    line = line.replace("SERVER_BOOTSTRAP", obj_attr_list["vpn_server_bootstrap"])
+                    if str(obj_attr_list["vpn_redis_discovery"]).lower() == "true" :
+                        line = line.replace("SERVER_BOOTSTRAP", obj_attr_list["vpn_server_bootstrap"])
+                    else :
+                        line = line.replace("SERVER_BOOTSTRAP", obj_attr_list["vpn_redis_discovery"])
                     line = line.replace("UUID", obj_attr_list["uuid"])
                     line = line.replace("OSCI_PORT", str(self.osci.port))
                     line = line.replace("OSCI_DBID", str(self.osci.dbid))
@@ -1229,7 +1238,10 @@ packages:"""
         
         _cn = obj_attr_list["cloud_name"]
         
-        _ohn = obj_attr_list["vpn_server_bootstrap"]
+        if str(obj_attr_list["vpn_redis_discovery"]).lower() == "true" :
+            _ohn = obj_attr_list["vpn_server_bootstrap"]
+        else :
+            _ohn = obj_attr_list["vpn_redis_discovery"]
         _fshn = obj_attr_list["vpn_server_bootstrap"]
 
         _pad = "      " 
@@ -1626,13 +1638,15 @@ packages:"""
             obj_attr_list["cloud_vm_name"] += '-' + obj_attr_list["cloud_name"]
             obj_attr_list["cloud_vm_name"] += '-' + "vm"
             obj_attr_list["cloud_vm_name"] += obj_attr_list["name"].split("_")[1]
-            obj_attr_list["cloud_vm_name"] += '-' + obj_attr_list["role"]
-            
-            if obj_attr_list["ai"] != "none" :            
-                obj_attr_list["cloud_vm_name"] += '-' + obj_attr_list["ai_name"]  
 
-            if "vm_name_suffix" in obj_attr_list :
-                obj_attr_list["cloud_vm_name"] = obj_attr_list["cloud_vm_name"] + '-' + obj_attr_list["vm_name_suffix"]
+            if "extended_instance_names" in obj_attr_list and str(obj_attr_list["extended_instance_names"]).lower() == "true" :
+                obj_attr_list["cloud_vm_name"] += '-' + obj_attr_list["role"]
+
+                if obj_attr_list["ai"] != "none" :
+                    obj_attr_list["cloud_vm_name"] += '-' + obj_attr_list["ai_name"]
+
+                if "vm_name_suffix" in obj_attr_list :
+                    obj_attr_list["cloud_vm_name"] = obj_attr_list["cloud_vm_name"] + '-' + obj_attr_list["vm_name_suffix"]
 
         if "cloud_vv_name" not in obj_attr_list :       
             obj_attr_list["cloud_vv_name"] = "cb-" + obj_attr_list["username"]
@@ -1735,7 +1749,7 @@ packages:"""
             else:
                 cbwarn(obj_attr_list["name"] + ": Problem with instance destroy, trying again...", True)
 
-            sleep(_wait)
+            _wait = self.backoff(obj_attr_list, _wait)
 
             _status, _fmsg = self.vmdestroy_repeat_and_check(obj_attr_list)
 
@@ -2072,3 +2086,13 @@ packages:"""
         finally :
             _status, _msg = self.common_messages("AI", obj_attr_list, "undefined", _status, _fmsg)
             return _status, _msg
+
+    @trace
+    def backoff(self, obj_attr_list, delay) :
+        # Sleep and simply double the delay
+        sleep(delay)
+        if "max_backoff" in obj_attr_list and str(obj_attr_list["max_backoff"]).lower() != "false" :
+            delay = min(delay * 2, int(obj_attr_list["max_backoff"]))
+            cbdebug("Backoff increased to " + str(delay) + " seconds.", False if "update_frequency" in obj_attr_list and (delay > (int(obj_attr_list["update_frequency"]) * 2)) else True)
+        return delay
+

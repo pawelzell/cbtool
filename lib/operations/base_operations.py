@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 #/*******************************************************************************
 # Copyright (c) 2012 IBM Corp.
 
@@ -1160,6 +1159,10 @@ class BaseObjectOperations :
                                                              "GLOBAL", False, \
                                                              "vm_templates", False)
 
+                        _size_templates = self.osci.get_object(obj_attr_list["cloud_name"], \
+                                                             "GLOBAL", False, \
+                                                             "size_templates", False)
+
                         if str(obj_attr_list["build"]).lower() == "true" :
                             _role_tmp = "check:" + obj_attr_list["imageid1"] + ':' + obj_attr_list["login"] + ':' + obj_attr_list["type"] + ":build"
                         else :
@@ -1240,7 +1243,11 @@ class BaseObjectOperations :
                             _msg = "The VM role \"" + obj_attr_list["role"] + "\" is not defined" 
                             _status = 6700
                             raise self.ObjectOperationException(_msg, _status)                            
-            
+
+                        if "imageid1" in obj_attr_list :
+                            if obj_attr_list["imageid1"].count("default") :
+                                obj_attr_list["imageid1"] = str2dic(_vm_templates["nest_containers_base_image"])["imageid1"]
+
                         _vm_template_attr_list = str2dic(_vm_templates[obj_attr_list["role"]])
             
                         if obj_attr_list["size"] == "load_balanced_default" :
@@ -1259,6 +1266,12 @@ class BaseObjectOperations :
                             del obj_attr_list["login"]
 
                         obj_attr_list.update(_vm_template_attr_list)
+
+                        if "size" in obj_attr_list :
+                            if obj_attr_list["size"] in _size_templates :
+                                _osize = obj_attr_list["size"]
+                                obj_attr_list["size"] = _size_templates[obj_attr_list["size"]]
+                                cbdebug("VM size \"" + _osize + "\" (vcpus-vmem GB) mapped to cloud-specific flavor \""  + obj_attr_list["size"] + "\".", True)                        
 
                         if str(obj_attr_list["userdata_post_boot"]).lower() == "true" \
                         or str(obj_attr_list["userdata_ssh"]).lower() == "true" :
@@ -1551,6 +1564,12 @@ class BaseObjectOperations :
         _log_store = self.osci.get_object(obj_attr_list["cloud_name"], \
                                              "GLOBAL", False, \
                                              "logstore", False)
+        
+        _api_attr_list = self.osci.get_object(obj_attr_list["cloud_name"], \
+                                                       "GLOBAL", \
+                                                       False, \
+                                                       "api_defaults", \
+                                                       False)
 
         obj_attr_list["filestore_host"] = _filestor_attr_list["hostname"]
         obj_attr_list["filestore_port"] = _filestor_attr_list["port"]
@@ -1560,6 +1579,7 @@ class BaseObjectOperations :
         obj_attr_list["vpn_server_ip"] = _vpn_attr_list["server_ip"]
         obj_attr_list["vpn_server_host"] = _vpn_attr_list["server_ip"]                        
         obj_attr_list["vpn_server_bootstrap"] = _vpn_attr_list["server_bootstrap"]
+        obj_attr_list["vpn_redis_discovery"] = _vpn_attr_list["redis_discovery"]
         obj_attr_list["vpn_server_port"] = _vpn_attr_list["server_port"]
         obj_attr_list["vpn_server_protocol"] = "TCP"
         
@@ -1577,6 +1597,12 @@ class BaseObjectOperations :
         obj_attr_list["objectstore_timeout"] = self.osci.timout
                 
         obj_attr_list["objectstore_protocol"] = "TCP"         
+
+        obj_attr_list["api_host"] = _api_attr_list["hostname"]
+        obj_attr_list["api_port"] = _api_attr_list["port"]
+
+        obj_attr_list["objectstore_dbid"] = self.osci.dbid
+        obj_attr_list["objectstore_timeout"] = self.osci.timout
 
         if obj_attr_list["login"] != "root" :
             obj_attr_list["remote_dir_home"] = "/home/" + obj_attr_list["login"]
@@ -2435,7 +2461,7 @@ class BaseObjectOperations :
                                                                  False)
 
                             obj_attr_list["load_generator_target_vm"] += _vm_uuid + ','
-                            if str(obj_attr_list["use_public_lb_network"]).lower() == "true" :
+                            if "load_balancer_target_role" in obj_attr_list and obj_attr_list["load_balancer_target_role"] != "none" and str(obj_attr_list["use_public_lb_network"]).lower() == "true" :
                                 obj_attr_list["load_generator_target_ip"] += _vm_attr_list["public_cloud_ip"] + ','
                             else :
                                 obj_attr_list["load_generator_target_ip"] += _vm_attr_list["run_cloud_ip"] + ','
@@ -3964,7 +3990,8 @@ class BaseObjectOperations :
                 _msg = "Flushing Log Store..."
                 cbdebug(_msg, True)
                 
-                _proc_man.run_os_command("pkill -9 -u " + _logstore_username + " -f rsyslogd")
+                if _logstore_attr_list["usage"].lower() != "shared" :
+                    _proc_man.run_os_command("pkill -9 -u " + _logstore_username + " -f rsyslogd")
                 _file_list = []
                 _file_list.append("operations.log")
                 _file_list.append("report.log")
@@ -3976,9 +4003,10 @@ class BaseObjectOperations :
                 _file_list.append("subscribe.log")
                 _file_list.append("staging.log")
                     
-                for _fn in  _file_list :
-                    _proc_man.run_os_command("rm -rf " + _log_dir + '/' + _logstore_username + '_' + _fn)
-                    _proc_man.run_os_command("touch " + _log_dir + '/' + _logstore_username + '_' + _fn)
+                if _logstore_attr_list["usage"].lower() != "shared" :
+                    for _fn in  _file_list :
+                        _proc_man.run_os_command("rm -rf " + _log_dir + '/' + _logstore_username + '_' + _fn)
+                        _proc_man.run_os_command("touch " + _log_dir + '/' + _logstore_username + '_' + _fn)
                     
                 _status, _msg = syslog_logstore_setup(_global_objects, "check")
 
@@ -4035,27 +4063,27 @@ class BaseObjectOperations :
         if "walkthrough" in obj_attr_list :
             if obj_attr_list["walkthrough"] == "true" :
                 if operation == "attach" :
-                    if _obj_type == "CLOUD" :
+                    if _obj_type == "CLOUD" or _obj_type == "VMC" or _obj_type == "VMCALL" :
                         _msg = "\n\n ATTENTION! Given that none of the pre-configured images listed on "
                         _msg += "CB's configuration file were detected on this cloud, "
                         _msg += "we need to start by testing the ability to create instances "
-                        _msg += "using unconfigured images. Start by executing \"vmattach check:<IMAGEID OF YOUR CHOICE>\" on the CLI\n"            
+                        _msg += "using unconfigured images. \n            Start by executing \"vmattach check:default\" (or \"vmattach check:<IMAGEID OF YOUR CHOICE>\") on the CLI\n"            
     
                     if _obj_type == "VM" and obj_attr_list["role"] == "check" :
                         if obj_attr_list["check_ssh"] == "false" :
                             _msg = "\n\n The ability to create instances using "
                             _msg += "unconfigured images was successfully verified!"
-                            _msg += " We may now proceed to check the ability to"
+                            _msg += "\n We may now proceed to check the ability to"
                             _msg += " connect (via ssh) to instances by executing "
-                            _msg += "\"vmattach check:<IMAGEID OF YOUR CHOICE>:<USERNAME FOR LOGIN>\""
+                            _msg += "\"vmattach check:default:" + obj_attr_list["login"] + "\" (or \"vmattach check:<IMAGEID OF YOUR CHOICE>:<USERNAME FOR LOGIN>\")"
                             _msg += " on the CLI.\n"
                         else :
                             if obj_attr_list["transfer_files"] == "false" :
                                 _msg = "\n\n The ability to create (and connect via ssh to)"
                                 _msg += " instances using unconfigured images was "
-                                _msg += "successfully verified. At this point, we need"
+                                _msg += "successfully verified!\n At this point, we need"
                                 _msg += " to create a base image for the Virtual Application \"nullworkload\""
-                                _msg += " by executing \"vmattach check:<IMAGEID OF YOUR CHOICE>:<USERNAME FOR LOGIN>:nullworkload\""
+                                _msg += " by executing \"vmattach check:default:" + obj_attr_list["login"] + ":nullworkload\" (or \"vmattach check:<IMAGEID OF YOUR CHOICE>:<USERNAME FOR LOGIN>:nullworkload\")"
                                 _msg += " on the CLI.\n"
                             else :
                                 if obj_attr_list["run_generic_scripts"] == "false" :
@@ -4091,7 +4119,6 @@ class BaseObjectOperations :
                         _msg += " instance, with the role \"tinyvm\", as part of the workload"
                         _msg += " \"nullworkload\". Now lets try to attach this new instance"
                         _msg += " with \"vmattach tinyvm\". on the CLI\n"                
-        
         return _msg
 
     @trace

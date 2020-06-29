@@ -419,7 +419,7 @@ class LibcloudCmds(CommonCloudFunctions) :
 
             _prov_netname_found, _run_netname_found = self.check_networks(vmc_name, vm_defaults)
 
-            _detected_imageids = self.check_images(vmc_name, vm_templates, credentials_list)
+            _detected_imageids = self.check_images(vmc_name, vm_templates, credentials_list, vm_defaults)
 
             _extra_vmc_setup_complete = self.extra_vmc_setup(vmc_name, vmc_defaults, vm_defaults, vm_templates, _local_conn)
 
@@ -481,7 +481,7 @@ class LibcloudCmds(CommonCloudFunctions) :
         return _prov_netname_found, _run_netname_found
 
     @trace
-    def check_images(self, vmc_name, vm_templates, credentials_list) :
+    def check_images(self, vmc_name, vm_templates, credentials_list, vm_defaults) :
         '''
         TBD
         '''
@@ -518,7 +518,7 @@ class LibcloudCmds(CommonCloudFunctions) :
 
                 _map_id_to_name[_map_name_to_id[_replacement_id]] = _replacement_id
 
-        _detected_imageids = self.base_check_images(vmc_name, vm_templates, _registered_imageid_list, _map_id_to_name)
+        _detected_imageids = self.base_check_images(vmc_name, vm_templates, _registered_imageid_list, _map_id_to_name, vm_defaults)
 
         return _detected_imageids
 
@@ -565,6 +565,7 @@ class LibcloudCmds(CommonCloudFunctions) :
             for credentials_list in obj_attr_list["credentials"].split(";"):
                 _status, _msg, _local_conn, _hostname = self.connect(credentials_list)
 
+            _wait = int(obj_attr_list["update_frequency"])
             _existing_instances = True
             while _existing_instances :
                 _existing_instances = False
@@ -581,7 +582,9 @@ class LibcloudCmds(CommonCloudFunctions) :
                             if _reservation.state in [ NodeState.PENDING, NodeState.STOPPED ] :
                                 cbdebug("Instance " + _reservation.name + " still has a pending event. waiting to destroy...")
                                 if _reservation.state == NodeState.STOPPED :
-                                    cbdebug("Instance is stopped: " + _reservation.name + " . CB will not destroy stopped instances. Please investigate why it is stopped.", True)
+                                    cbdebug("Instance is stopped: " + _reservation.name + " . CB will not destroy stopped instances, but we have sent a start request to the cloud. If it does not resume, please investigate why it is stopped.", True)
+                                    self.get_adapter(credentials_list).ex_power_on_node(_reservation)
+
                                 _existing_instances = True
                                 continue
 
@@ -604,10 +607,11 @@ class LibcloudCmds(CommonCloudFunctions) :
                             _msg = "Cleaning up " + self.get_description() + ".  Ignoring instance: " + _reservation.name
                             cbdebug(_msg)
 
-                    if _existing_instances :
-                        sleep(int(obj_attr_list["update_frequency"]))
+                if _existing_instances :
+                    _wait = self.backoff(obj_attr_list, _wait)
 
             if self.use_volumes :
+                _wait = int(obj_attr_list["update_frequency"])
                 _running_volumes = True
                 while _running_volumes :
                     _running_volumes = False
@@ -636,8 +640,7 @@ class LibcloudCmds(CommonCloudFunctions) :
                                 cbdebug(_msg)
 
                         if _running_volumes :
-                            sleep(int(obj_attr_list["update_frequency"]))
-
+                            _wait = self.backoff(obj_attr_list, _wait)
             _status = 0
 
         except CldOpsException, obj :
@@ -682,13 +685,7 @@ class LibcloudCmds(CommonCloudFunctions) :
             obj_attr_list["cloud_hostname"] = _hostname + "_" + obj_attr_list["name"]
 
             # Public clouds don't really have "hostnames" - they have a single endpoint for all
-            # regions and VMCs. However, in Redis this IP gets tagged
-            # and must be unique, so we have to prefix this so it will be unique.
-            # That makes this "cloud_ip" not a real IP, but unless we stop tagging it,
-            # it still has to be unique to every VMC.
-            # I'm not totally sure what this means for an Openstack + Libcloud adapter,
-            # but we'll cross that bridge when we get to it.
-
+            # regions and VMCs.
             obj_attr_list["cloud_ip"] = _hostname + "." + gethostbyname(self.tldomain) + "_" + obj_attr_list["name"]
             obj_attr_list["arrival"] = int(time())
 
@@ -902,8 +899,24 @@ class LibcloudCmds(CommonCloudFunctions) :
             _msg = "cloud_vm_name " + obj_attr_list["log_string"]
             _msg += " from " + self.get_description() + " \"" + obj_attr_list["cloud_name"] + "\""
             cbdebug(_msg)
+            _wait = int(obj_attr_list["update_frequency"])
+            _curr_tries = 0
 
-            node_list = self.get_adapter(obj_attr_list["credentials_list"]).list_nodes(*self.get_list_node_args(obj_attr_list))
+            # This call (list nodes) is a very high-frequency call and fails often. It causes
+            # vmcreate()'s to fail unnecessarily, because it can be called dozens of times before
+            # a create has actually completed, so let's include a retry.
+            # However, we don't want to extend the overall timeouts any further than what has been configured.
+            # So, let's retry only every 1-second until we hit the maximum.
+            while True :
+                try :
+                    node_list = self.get_adapter(obj_attr_list["credentials_list"]).list_nodes(*self.get_list_node_args(obj_attr_list))
+                    break
+                except Exception, e:
+                    _curr_tries += 1
+                    if _curr_tries > _wait :
+                        raise e
+                    cbwarn("Problem querying for instance (" + str(_curr_tries) + "): " + obj_attr_list["log_string"] + ": " + str(e) + ", retrying...")
+                    sleep(1)
 
             node = False
             if node_list :
@@ -1473,7 +1486,8 @@ class LibcloudCmds(CommonCloudFunctions) :
 
                     if _instance.state in [ NodeState.PENDING, NodeState.STOPPED ] :
                         if _instance.state == NodeState.STOPPED :
-                            cbdebug("Instance " + obj_attr_list["name"] + " (" + _instance.name + ") is stopped. CB will not destroy stopped instances. Please investigate why it is stopped.", True)
+                            cbdebug("Instance " + obj_attr_list["name"] + " (" + _instance.name + ") is stopped. CB will not destroy stopped instances, but we have sent a power on request. If it is still not online, please investigate why it is stopped.", True)
+                            self.get_adapter(_credentials_list).ex_power_on_node(_instance)
                         else :
                             cbdebug("Instance " + obj_attr_list["name"] + " (" + _instance.name + ") still has a pending event. Waiting to destroy...", True)
                         sleep(_wait)
