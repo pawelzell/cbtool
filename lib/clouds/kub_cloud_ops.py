@@ -1274,6 +1274,7 @@ class KubCmds(CommonCloudFunctions) :
                                        "namespace": obj_attr_list["namespace"]
                                      }, \
                          "spec": { "replicas": int(obj_attr_list["replicas"]), \
+                                   "selector": { "matchLabels": { "app": obj_attr_list["cloud_vm_name"] } },
                                    "template": {
                                                 "metadata": { "labels": { "app": obj_attr_list["cloud_vm_name"], \
                                                                           "role": "master", \
