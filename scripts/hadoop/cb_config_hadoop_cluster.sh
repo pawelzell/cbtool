@@ -249,6 +249,11 @@ cat << EOF >> $output_file
     <name>yarn.resourcemanager.webapp.address</name>
     <value>${my_ip_addr}:8088</value>
   </property>
+  <property>
+    <description>https://stackoverflow.com/questions/29131449/why-does-hadoop-report-unhealthy-node-local-dirs-and-log-dirs-are-bad</description>
+    <name>yarn.nodemanager.disk-health-checker.max-disk-utilization-per-disk-percentage</name>
+    <value>98.5</value>
+  </property>
 </configuration>
 EOF
 
