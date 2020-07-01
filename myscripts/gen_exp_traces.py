@@ -19,6 +19,9 @@ vmcattach all
 vmclist
 
 cldalter ai_defaults run_limit=100000000
+typealter open_daytrader load_level=5
+typealter open_daytrader load_duration=100
+typealter sysbench load_level=1
 typealter hadoop load_level=1
 typealter wrk load_level=1
 typealter wrk load_duration=1
