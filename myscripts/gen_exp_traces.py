@@ -6,7 +6,7 @@ import pandas as pd
 resource_data_csv = "resource.csv"
 types_default = ["redis_ycsb", "wrk", "hadoop", "linpack"]
 hadoop_slave_no = 2
-max_hadoop_count = 15
+max_hadoop_count = 8
 scheduler_exp_shuffles_count = 1
 
 resource_constraints = "typealter {type} {role}_{resource}_{constraint}={value}\n"
@@ -201,7 +201,8 @@ def main():
     if args.mode == "linear":
         for x in types:
             for y in types:
-                gen_exp_linear(x, y, no, args.task_count, args.interval, constraints)
+                task_count = args.task_count if y != "hadoop" else min(args.task_count, max_hadoop_count)
+                gen_exp_linear(x, y, no, task_count, args.interval, constraints)
                 no += 1
     elif args.mode == "mixed":
         for _ in range(args.experiment_count):
