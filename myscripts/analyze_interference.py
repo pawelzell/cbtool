@@ -13,8 +13,9 @@ def plotRegressionLine(ax, x, y, yerr, b):
     ax.plot(x, y_pred, color="g")
 
 
-def computeInterferenceRegression(exp, metric_name="latency"):
-    xs, ys, ys_error = getTrainingData(exp.exp_series, exp.t1, exp.t2, "tasks")
+def computeInterferenceRegression(exp, inverse_throughput_y):
+    xs, ys, ys_error = getTrainingData(exp.exp_series, exp.t1, exp.t2, "tasks",
+                                       inverse_throughput_y=inverse_throughput_y)
     reg = linear_model.LinearRegression()
     reg.fit(xs, ys)
     error = mean_squared_error(ys, reg.predict(xs))
@@ -24,26 +25,25 @@ def computeInterferenceRegression(exp, metric_name="latency"):
     return coefs
 
 
-def computeInterferenceRegressionGrid(exp_series):
+def computeInterferenceRegressionGrid(exp_series, inverse_throughput_y):
     tasks = exp_series.tasks
     n = len(tasks)
     results = np.zeros((n, n))
     for i, t1 in enumerate(tasks):
         for j, t2 in enumerate(tasks):
             metric = exp_series.getPerfMetricsForTypeShort(t1)
-            sign = -1. if metric in ["throughput", "bandwidth"] else 1.
             try:
                 expid = exp_series.getExperiment(t1, t2)
             except KeyError:
                 # print(f"WARNING: No experiment data for {t1} {t2}")
                 results[i, j] = 0
             else:
-                coefs = computeInterferenceRegression(expid, metric_name=metric)
-                results[i, j] = coefs[1] * sign
+                coefs = computeInterferenceRegression(expid, inverse_throughput_y)
+                results[i, j] = coefs[1]
     return results
 
 
-def printInterferenceGridMultipleSeries(exp_series_list, skip_tasks=()):
+def printInterferenceGridMultipleSeries(exp_series_list, skip_tasks=(), savefig=False):
     tasks = exp_series_list[0].tasks
     n = len(tasks)
 
@@ -71,21 +71,26 @@ def printInterferenceGridMultipleSeries(exp_series_list, skip_tasks=()):
                     # print(f"WARNING: No experiment data for {t1} {t2}")
                 else:
                     plotRegressionLine(ax, exp.xs, exp.ys, exp.ys_error, exp.coefs)
-    plt.show()
+    if savefig:
+        file_name = f"{exp_series_list[0].node}_interference_grid"
+        plt.savefig(file_name)
+        print(f"Figure saved to {file_name}")
+    else:
+        plt.show()
 
 
-def printInterferenceGrid(exp_series_list, skip_tasks=()):
-    printInterferenceGridMultipleSeries([exp_series_list], skip_tasks)
+def printInterferenceGrid(exp_series_list, skip_tasks=(), savefig=False):
+    printInterferenceGridMultipleSeries([exp_series_list], skip_tasks, savefig)
 
 
-def analyzeInterferenceGridMultipleSeries(exp_series_list, skip_tasks=()):
+def analyzeInterferenceGridMultipleSeries(exp_series_list, skip_tasks, inverse_throughput_y, savefig):
     for exp_series in exp_series_list:
-        computeInterferenceRegressionGrid(exp_series)
-    printInterferenceGridMultipleSeries(exp_series_list, skip_tasks)
+        computeInterferenceRegressionGrid(exp_series, inverse_throughput_y)
+    printInterferenceGridMultipleSeries(exp_series_list, skip_tasks, savefig)
 
 
-def analyzeInterferenceGrid(exp_series, skip_tasks=()):
-    return analyzeInterferenceGridMultipleSeries([exp_series], skip_tasks)
+def analyzeInterferenceGrid(exp_series, skip_tasks=(), inverse_throughput_y=True, savefig=False):
+    return analyzeInterferenceGridMultipleSeries([exp_series], skip_tasks, inverse_throughput_y, savefig)
 
 
 def extractInterferenceMatrix(exp_series):
@@ -94,12 +99,18 @@ def extractInterferenceMatrix(exp_series):
     for i, t1 in enumerate(exp_series.tasks):
         for j, t2 in enumerate(exp_series.tasks):
             metric = exp_series.getPerfMetricsForTypeShort(t1)
-            sign = -1. if metric in ["throughput", "bandwidth"] else 1.
             try:
                 exp = exp_series.getExperiment(t1, t2)
             except KeyError:
                 # print(f"WARNING: No experiment data for {t1} {t2}")
                 result[i, j] = 0
             else:
-                result[i, j] = exp.coefs[1] * sign
+                result[i, j] = exp.coefs[1]
     return result
+
+
+def computeNodeToCoeffs(exp_series_list):
+    results = {}
+    for exp_series in exp_series_list:
+        results[exp_series.node] = computeInterferenceRegressionGrid(exp_series, True)
+    return results

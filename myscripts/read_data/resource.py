@@ -1,6 +1,7 @@
 import os
 import glob
 import pandas as pd
+import ai_info
 from read_data.utils import *
 
 
@@ -14,30 +15,53 @@ def getResDataPaths(expid, ai_no, role, resource):
     return paths
 
 
-# DF: expid, t1, t2, ai_no, ai_role, tasks, avg_cpu, std_cpu, cpu_samples_count
-def getResourceDatapoint(expid, ai_no, ai_role, tasks, ts, df):
+def getResourceDatapointValues(d, ts, df):
     df = df.loc[dfInterval(df, *ts), ["datetime", "value"]]
     values = df["value"]
-    d = {"expid": expid.expid, "t1": expid.t1, "t2": expid.t2, "ai_no": ai_no + 1}
-    d.update({"ai_role": ai_role, "tasks": tasks + 1})
     if values.count() == 0:
-        raise ValueError(f"No data samples for {expid.expid} {ai_no+1} {ai_role} {tasks}")
+        raise ValueError(f"No data samples for {d}")
     d.update({"avg_cpu": values.mean(), "std_cpu": values.std(), "cpu_samples_count": values.count()})
     return toSingleRowDF(d)
 
 
+# DF: expid, t1, t2, ai_no, ai_role, tasks, avg_cpu, std_cpu, cpu_samples_count
+def getResourceDatapointLinearExperiment(expid, ai_no, ai_role, tasks, ts, df):
+    d = {"expid": expid.expid, "t1": expid.t1, "t2": expid.t2, "ai_no": ai_no + 1,
+         "ai_role": ai_role, "tasks": tasks + 1}
+    return getResourceDatapointValues(d, ts, df)
+
+
+def getResourceDatapointSchedulerExperiment(expid, ai_no, ai_role, host, ts, df):
+    d = {"expid": expid.expid, "composition_id": expid.composition_id, "shuffle_id": expid.shuffle_id,
+         "scheduler": expid.custom_scheduler, "ai_no": ai_no+1, "ai_role": ai_role, "host": host}
+    return getResourceDatapointValues(d, ts, df)
+
+
 def getResourceDatapointsSingleFile(expid, ai_no, ai_role, tss, df):
     results = pd.DataFrame()
-    for tasks in range(ai_no, len(tss)):
-        result = getResourceDatapoint(expid, ai_no, ai_role, tasks, tss[tasks], df)
+    if expid.exp_series.type == "linear":
+        for tasks in range(ai_no, len(tss)):
+            result = getResourceDatapointLinearExperiment(expid, ai_no, ai_role, tasks, tss[tasks], df)
+            results = results.append(result, ignore_index=True)
+    elif expid.exp_series.type == "scheduler":
+        if len(tss) != 1:
+            raise TypeError("Resource datapoints extraction for scheduler experiments "
+                            f"expects 1 interval got {len(tss)}")
+        ts = tss[0]
+        # TODO compute ai map only once
+        ai_name_to_host_and_role = expid.computeAINameToHostAndTypeMap(expid.exp_series.df)
+        ai_name = formatAIName(ai_no+1)
+        host, _ = ai_name_to_host_and_role[ai_name]
+        result = getResourceDatapointSchedulerExperiment(expid, ai_no, ai_role, host, ts, df)
         results = results.append(result, ignore_index=True)
+    else:
+        raise TypeError(f"Unknown exp_series type {expid.exp_series.type}")
     return results
 
 
-def getResourceDatapoints(expid, ai_no, tss):
+def getResourceDatapoints(expid, ai_no, ai_type, tss):
     results = pd.DataFrame()
-    t = expid.t1 if ai_no == 0 else expid.t2
-    for ai_role in expid.exp_series.ai_type_role[t]:
+    for ai_role in ai_info.AI_TYPE_TO_ROLE[ai_type]:
         paths = getResDataPaths(expid, ai_no, ai_role, "cpu")
         for path in paths:
             df = readResData(path)
@@ -61,8 +85,30 @@ def getCpuData(exp_series):
                 tss = getSplitIntervals(df, exp_series.getSplitIntervalMethod())
                 max_ais = len(tss)
                 for ai_no in range(max_ais):
-                    result = getResourceDatapoints(expid, ai_no, tss)
+                    t = expid.t1 if ai_no == 0 else expid.t2
+                    result = getResourceDatapoints(expid, ai_no, t, tss)
                     results = results.append(result, ignore_index=True)
+    return results
+
+
+def getCpuDataSchedulerExperiment(exp_series):
+    print("Getting cpu data")
+    results = pd.DataFrame()
+    if exp_series.type != "scheduler":
+        raise TypeError(f"Expected scheduler exp_series got {exp_series.type}")
+    for _, exp in exp_series.experiments.items():
+        ai_name_to_host_and_type = exp.computeAINameToHostAndTypeMap(exp_series.df)
+        for ai_no in range(exp_series.ai_count):
+            ai_name = formatAIName(ai_no+1)
+            if ai_name not in ai_name_to_host_and_type.keys():
+                print(f"WARNING: AI name missing from ai_name_to_host_and_type map: {ai_name}")
+                continue
+            _, ai_type = ai_name_to_host_and_type[ai_name]
+            try:
+                result = getResourceDatapoints(exp, ai_no, ai_type, [exp.split_interval])
+                results = results.append(result, ignore_index=True)
+            except ValueError:
+                print(f"WARNING: No resource data for {exp.expid} {ai_no+1}")
     return results
 
 
@@ -73,7 +119,20 @@ def getCpuAggregate(cpu):
     return cpu_sum
 
 
+def getCpuAggregateSchedulerExperiment(cpu):
+    print("Aggregating cpu data")
+    cpu_sum = cpu.groupby(["expid", "composition_id", "shuffle_id", "scheduler", "host"], as_index=False).sum()
+    cpu_sum.pop("ai_no")
+    return cpu_sum
+
+
 def getCpuDataAll(exp_series):
     cpu = getCpuData(exp_series)
     agg = getCpuAggregate(cpu)
+    return {"cpu": cpu, "cpu_agg": agg}
+
+
+def getCpuDataAllSchedulerExperiment(exp_series):
+    cpu = getCpuDataSchedulerExperiment(exp_series)
+    agg = getCpuAggregateSchedulerExperiment(cpu)
     return {"cpu": cpu, "cpu_agg": agg}

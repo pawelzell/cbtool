@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 from sklearn import linear_model
 from sklearn.metrics import mean_squared_error
 
+import ai_info
+
 
 class ExperimentRecord:
     def __init__(self, t1, t2, path, exp_series):
@@ -25,6 +27,7 @@ class ExperimentRecord:
 
 class ExperimentSeries:
     def __init__(self, path, tasks, ai_role_count=None, options=None, node="baati"):
+        self.type = "linear"
         self.tasks = tasks
         self.path = path
         self.node = node
@@ -45,18 +48,8 @@ class ExperimentSeries:
                     #print(f"Missing record for {t1} {t2}")
         print(f"Found {len(self.type_pair_to_exp)} experiment in series {self.name}")
 
-        ai_type_role = dict()
-        ai_type_role["redis_ycsb"] = ["ycsb", "redis"]
-        ai_type_role["hadoop"] = ["hadoopmaster", "hadoopslave"]
-        ai_type_role["linpack"] = ["linpack"]
-        ai_type_role["wrk"] = ["wrk", "apache"]
-        ai_type_role["filebench"] = ["filebench"]
-        ai_type_role["unixbench"] = ["unixbench"]
-        ai_type_role["netperf"] = ["netclient", "netserver"]
-        self.ai_type_role = ai_type_role
-
         self.ai_role_count = {}
-        for _, ai_roles in self.ai_type_role.items():
+        for _, ai_roles in ai_info.AI_TYPE_TO_ROLE.items():
             for ai_role in ai_roles:
                 self.ai_role_count[ai_role] = 1
         if ai_role_count:

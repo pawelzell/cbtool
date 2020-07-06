@@ -4,7 +4,17 @@ import pandas as pd
 from read_data.utils import *
 
 
-def getPerfAggregateForMetric(expid, df, ai_no, tasks, metric, d, quantiles=[0.25, 0.5, 0.75]):
+def getPerfAggregateForMetricHelper(df, d, metric, quantiles=(0.25, 0.5, 0.75)):
+    perf = df[metric]
+    m = metric[len("app_"):]
+    d.update({f"avg_{m}": perf.mean(), f"std_{m}": perf.std()})
+    d.update({f"{m}_samples_count": perf.count()})
+    for q in quantiles:
+        d.update({formatQuantileColumnName(m, q): perf.quantile(q)})
+    return d
+
+
+def getPerfAggregateForMetric(expid, df, ai_no, tasks, metric, d):
     df = df.loc[df[metric].notna(), :]
     if df.empty:
         msg = f"Performance aggregation failed: no datapoints for " \
@@ -14,13 +24,7 @@ def getPerfAggregateForMetric(expid, df, ai_no, tasks, metric, d, quantiles=[0.2
         else:  # We do not care about "noise tasks" performance
             print(f"WARNING: {msg}")
             return d
-    perf = df[metric]
-    m = metric[len("app_"):]
-    d.update({f"avg_{m}": perf.mean(), f"std_{m}": perf.std()})
-    d.update({f"{m}_samples_count": perf.count()})
-    for q in quantiles:
-        d.update({formatQuantileColumnName(m, q): perf.quantile(q)})
-    return d
+    return getPerfAggregateForMetricHelper(df, d, metric)
 
 
 def getPerfAggregateForAIAndTaskNumber(expid, df, ai_no, tasks, ts):

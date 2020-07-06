@@ -55,3 +55,8 @@ def toSingleRowDF(d):
 
 def formatQuantileColumnName(m, q):
     return f"{m}_quantile{int(q * 100)}"
+
+
+# ai_no starting from 1
+def formatAIName(ai_no):
+    return f"ai_{ai_no}"
