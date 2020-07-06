@@ -92,10 +92,12 @@ def getResourceLimitsRecord(ai_type, ai_role, resource, df):
 
 def getResourceLimits(exp_series):
     results = pd.DataFrame()
-    for ai_type, roles in exp_series.ai_type_role.items():
-        if ai_type not in exp_series.tasks:
+    for ai_type in exp_series.tasks:
+        try:
+            expid = exp_series.getExperiment(ai_type, ai_type)
+        except KeyError:
+            print(f"ERROR: Experiment for a type pair {ai_type},{ai_type} not found. Skipping.")
             continue
-        expid = exp_series.getExperiment(ai_type, ai_type)
         print(expid.expid)
         df = readExp(expid)
         if "ai_2" in df["ai_name"].unique():
@@ -104,7 +106,7 @@ def getResourceLimits(exp_series):
             tmax = df.loc[df["ai_name"] == "ai_1", "datetime"].max()
         tmin = df.loc[df["ai_name"] == "ai_1", "datetime"].min()
         ts = (tmin, tmax)
-        for role in roles:
+        for role in ai_info.AI_TYPE_TO_ROLE[ai_type]:
             for resource in ["cpu", "memory"]:
                 df = getResourceSinglePod(expid, role, ts, resource)
                 record = getResourceLimitsRecord(ai_type, role, resource, df)
