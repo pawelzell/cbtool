@@ -114,7 +114,7 @@ def getResourceLimits(exp_series):
     return results
 
 
-def getMetricsStatsColumnNames(quantiles=[0.25, 0.5, 0.75]):
+def getMetricsStatsColumnNames(quantiles=(0.25, 0.5, 0.75)):
     results = []
     for m in ["throughput", "latency"]:
         results += [f"{m}_samples_count", f"avg_{m}", f"std_{m}"]

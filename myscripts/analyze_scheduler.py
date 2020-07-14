@@ -296,6 +296,7 @@ def computeExpectedCost(ai_types, node_to_loads, node_to_coefficients):
             xs.append(f"{node} {ai_type}")
     return xs, values
 
+
 def plotActualVsExpectedCost(exp_series, node_to_coefficients, composition_id):
     k = len(exp_series.df["scheduler"].unique())
     fig, axs = plt.subplots(1, k, figsize=(k * 5, 4))

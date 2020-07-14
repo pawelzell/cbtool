@@ -33,6 +33,7 @@ class ExperimentSeries:
         self.node = node
         self.dfs = {}  # Dict with dataframes with resources usage and perf data
         self.df = None  # Main dataframe with aggregated performance vs cpu data
+        self.interference_matrix = None
         _, self.name = os.path.split(path)
         self.type_pair_to_exp = dict()
         for t1 in tasks:
@@ -94,7 +95,8 @@ class ExperimentSeries:
         return self.options["interval_boundaries"]
 
 
-def getTrainingData(exp_series, t1=None, t2=None, x_col="avg_cpu", inverse_throughput_y=False, cpu_limit=None):
+def getTrainingData(exp_series, t1=None, t2=None, x_col="avg_cpu", inverse_throughput_y=False, cpu_limit=None,
+                    x_col_limit=None, subtract_xs=0., subtract_ys=0.):
     df = exp_series.df
     if not t1:
         results = [[], [], []]
@@ -113,23 +115,29 @@ def getTrainingData(exp_series, t1=None, t2=None, x_col="avg_cpu", inverse_throu
             selected_rows = selected_rows & (df["t2"] == t2)
         if cpu_limit:
             selected_rows = selected_rows & (df["avg_cpu"] <= cpu_limit)
+        if x_col_limit:
+            selected_rows = selected_rows & (df[x_col] <= x_col_limit)
         data = df.loc[selected_rows, :]
         if data.empty:
             return np.array([]), np.array([]), np.array([])
 
         xs = data.loc[selected_rows, x_col].to_numpy()
         xs = xs.reshape(-1, 1)
+        xs = xs.astype(np.float64)
+        xs -= subtract_xs
         ys = data.loc[selected_rows, avg_metric].to_numpy()
         ys_err = data.loc[selected_rows, std_metric].to_numpy()
         if inverse_throughput_y and (metric in ["throughput_rescaled", "bandwidth_rescaled"]):
             ys = 1. / ys
+        ys -= subtract_ys
         return xs, ys, ys_err
 
 
-def getTrainingDataMultipleSeries(exp_series_list, t1=None, t2=None, x_col="avg_cpu", inverse_throughput_y=False, cpu_limit=None):
+def getTrainingDataMultipleSeries(exp_series_list, t1=None, t2=None, x_col="avg_cpu", inverse_throughput_y=False,
+                                  cpu_limit=None, x_col_limt=None):
     results = [np.array([]) for _ in range(3)]
     for exp_series in exp_series_list:
-        result = getTrainingData(exp_series, t1, t2, x_col, inverse_throughput_y, cpu_limit)
+        result = getTrainingData(exp_series, t1, t2, x_col, inverse_throughput_y, cpu_limit, x_col_limt)
         for i in range(len(results)):
             results[i] = np.append(results[i], result[i])
     results[0] = results[0].reshape((-1, 1))
