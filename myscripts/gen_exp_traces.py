@@ -6,7 +6,7 @@ import pandas as pd
 resource_data_csv = "resource.csv"
 types_default = ["redis_ycsb", "wrk", "hadoop", "linpack"]
 hadoop_slave_no = 2
-max_hadoop_count = 15
+max_hadoop_count = 8
 scheduler_exp_shuffles_count = 1
 
 resource_constraints = "typealter {type} {role}_{resource}_{constraint}={value}\n"
@@ -29,7 +29,8 @@ typealter wrk load_duration=1
 
 ai_type_to_role = {"redis_ycsb": ("ycsb", "redis"), "hadoop": ("hadoopmaster", "hadoopslave"),
                    "linpack": ("linpack",), "wrk": ("wrk", "apache"), "filebench": ("filebench",),
-                   "unixbench": ("unixbench",), "netperf": ("netclient", "netserver")}
+                   "unixbench": ("unixbench",), "netperf": ("netclient", "netserver"),
+                   "sysbench": ("sysbench", "mysql")}
 
 use_custom_scheduler = "typealter {} {}_custom_scheduler={}\n"
 
@@ -89,13 +90,19 @@ def gen_exp(expid, filename, tasks, interval, constraints, exp_type, exp_summary
     with open(filename, "w") as f:
         f.write(description_line.format(exp_type, expid, exp_summary))
         f.write(prefix.format(expid))
+        f.write(hadoop_sut.format(hadoop_slave_no))
+        f.write("\n")
+
         if custom_scheduler is not None:
             for t, roles in ai_type_to_role.items():
                 for role in roles:
                     f.write(use_custom_scheduler.format(t, role, custom_scheduler))
-        f.write(hadoop_sut.format(hadoop_slave_no))
+        f.write("\n")
+
         for c in constraints:
             f.write(resource_constraints.format(**c))
+        f.write("\n")
+
         for task in tasks:
             f.write(attach_instance.format(task, "async" if async else ""))
             f.write(wait_cmd.format(interval))
@@ -103,6 +110,7 @@ def gen_exp(expid, filename, tasks, interval, constraints, exp_type, exp_summary
             f.write(wait_for_all_ai_arrival.format(len(tasks)))
         if end_interval is not None:
             f.write(wait_cmd.format(end_interval))
+        f.write("\n")
         f.write(suffix)
 
 
@@ -201,7 +209,8 @@ def main():
     if args.mode == "linear":
         for x in types:
             for y in types:
-                gen_exp_linear(x, y, no, args.task_count, args.interval, constraints)
+                task_count = args.task_count if y != "hadoop" else min(args.task_count, max_hadoop_count)
+                gen_exp_linear(x, y, no, task_count, args.interval, constraints)
                 no += 1
     elif args.mode == "mixed":
         for _ in range(args.experiment_count):

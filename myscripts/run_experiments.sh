@@ -5,6 +5,14 @@ if [[ (( $# -lt 2 ) || ( $1 != "-files" )) && (( $# -ne 3 ) || ( $1 != "-schedul
   exit 1
 fi
 
+pull_images () {
+  kIMAGES=`awk '/^aiattach/ {print $2}' ../${kEXPFILE} | sort -u`
+  for kIMAGE in $kIMAGES; do
+    echo "Pull image $kIMAGE"
+    ./pull_images.sh $kIMAGE
+  done
+}
+
 kEXPDIR="../traces"
 if [[ $1 == "-files" ]]; then
   kEXPFILES=${@:2}
@@ -12,9 +20,9 @@ else
   kEXPFILES=()
   for i in $(eval echo {$2..$3}); do
     for j in {0..0}; do
-        kEXPFILES+=("${i}scheduler${j}_round_robin")
-        #kEXPFILES+=("${i}scheduler${j}_random")
+        #kEXPFILES+=("${i}scheduler${j}_round_robin")
         kEXPFILES+=("${i}scheduler${j}_custom")
+        kEXPFILES+=("${i}scheduler${j}_random")
     done
   done
 fi
@@ -24,11 +32,10 @@ for kEXPFILE in ${kEXPFILES[@]}; do
   ./export_config_to_scheduler.sh ../${kEXPFILE} random-scheduler
   ./export_config_to_scheduler.sh ../${kEXPFILE} type-aware-scheduler
   ./clear_influxdb.sh
-  kIMAGES=`awk '/^aiattach/ {print $2}' ../${kEXPFILE} | sort -u`
-  for kIMAGE in $kIMAGES; do
-    echo "Pull image $kIMAGE"
-    ./pull_images.sh $kIMAGE
-  done
+  echo "Sleep for 15s to make sure that scheduler read the experiment config"
+  sleep 15s
+  # When abstraction=deployemnt is used there is no need to pull images
+  pull_images
   cd .. || exit 1
   echo "Will run cbtool for expfile: $kEXPFILE"
   kEXPID=`awk '/^expid/ {print}' ${kEXPFILE} | sed 's/expid //'`
