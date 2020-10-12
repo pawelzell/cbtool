@@ -46,6 +46,10 @@ def getSplitIntervals(df, method="max"):
         raise KeyError(f"Method not supported {method}")
 
 
+def splitByIntervals(df, tss):
+    return [df[dfInterval(df, *ts)] for ts in tss]
+
+
 def toSingleRowDF(d):
     d2 = {}
     for k, v in d.items():

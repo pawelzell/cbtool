@@ -6,8 +6,10 @@ from read_data.utils import *
 
 
 def getResDataPaths(expid, ai_no, role, resource):
-    paths = glob.glob(os.path.join(expid.path, \
-                                   f"resources/metric_pod_*{role}-ai-{ai_no+1}_{resource}.csv"))
+    # Role in resources files has underscore replaced with hyphen
+    formatted_role = role.replace("_", "-")
+    paths = glob.glob(os.path.join(expid.path,
+                                   f"resources/metric_pod_*{formatted_role}-ai-{ai_no+1}_{resource}.csv"))
     expected_count = expid.exp_series.ai_role_count[role]
     if len(paths) != expected_count:
         raise ValueError(f"Unexpected number of resources {len(paths)} != {expected_count} for " \

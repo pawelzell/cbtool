@@ -49,10 +49,7 @@ class ExperimentSeries:
                     #print(f"Missing record for {t1} {t2}")
         print(f"Found {len(self.type_pair_to_exp)} experiment in series {self.name}")
 
-        self.ai_role_count = {}
-        for _, ai_roles in ai_info.AI_TYPE_TO_ROLE.items():
-            for ai_role in ai_roles:
-                self.ai_role_count[ai_role] = 1
+        self.ai_role_count = ai_info.AI_ROLE_TO_COUNT.copy()
         if ai_role_count:
             self.ai_role_count.update(ai_role_count)
         self.options = {"interval_boundaries": "max"}
@@ -76,7 +73,7 @@ class ExperimentSeries:
         return self.type_pair_to_exp[(t1, t2)]
 
     def getPerfMetricsForType(self, t1):
-        if t1 not in self.tasks:
+        if t1 not in ai_info.AI_TYPE_TO_METRICS:
             raise ValueError("Type not supported")
         if t1 == "linpack":
             return ["app_throughput"]
@@ -86,6 +83,8 @@ class ExperimentSeries:
             return ["app_bandwidth"]
         if t1 == "unixbench":
             return ["app_throughput"]
+        if t1 == "multichase":
+            return ["app_throughput", "app_errors", "app_completion_time"]
         return ["app_latency", "app_throughput"]
 
     def getPerfMetricsForTypeShort(self, t1):

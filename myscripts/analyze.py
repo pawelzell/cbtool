@@ -114,6 +114,13 @@ def getResourceLimits(exp_series):
     return results
 
 
+def appendResourceLimits(exp_series, input="resource.csv", output="resource2.csv"):
+    limits = pd.read_csv(input)
+    new_limits = getResourceLimits(exp_series)
+    limits = limits.append(new_limits, ignore_index=True)
+    limits.to_csv(output)
+    
+
 def getMetricsStatsColumnNames(quantiles=(0.25, 0.5, 0.75)):
     results = []
     for m in ["throughput", "latency"]:
