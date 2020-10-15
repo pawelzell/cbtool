@@ -3,7 +3,6 @@ import random
 import sys
 import os
 import pandas as pd
-resource_data_csv = "resource.csv"
 types_default = ["redis_ycsb", "wrk", "hadoop", "linpack"]
 hadoop_slave_no = 2
 max_hadoop_count = 8
@@ -22,9 +21,9 @@ cldalter ai_defaults run_limit=100000000
 typealter open_daytrader load_level=5
 typealter open_daytrader load_duration=100
 typealter sysbench load_level=1
+typealter oldisim load_level=1
 typealter hadoop load_level=1
 typealter wrk load_level=1
-typealter wrk load_duration=1
 """
 
 ai_type_to_role = {"redis_ycsb": ("ycsb", "redis"), "hadoop": ("hadoopmaster", "hadoopslave"),
@@ -62,19 +61,19 @@ def is_mixed_tasks_list_valid(tasks):
     return hadoop_count <= max_hadoop_count
 
 
-def get_resource_constraints():
+def get_resource_constraints(resource_data_csv):
     results = []
     df = pd.read_csv(resource_data_csv)
     for row in df.itertuples():
         if row.resource == "cpu":
-            requests = "1"
-            limits = int(2 * row.avg)
-        elif row.resource == "memory":
-            if row.type != "hadoop":
-                # Set memory constraints only for hadoop
-                continue
             requests = int(row.avg)
             limits = int(2 * row.avg)
+        elif row.resource == "memory":
+            continue
+            #if row.type != "hadoop":
+            # Set memory constraints only for hadoop
+            #requests = int(row.avg)
+            #limits = int(2 * row.avg)
         else:
             print(f"Unknown resource {row.resource}")
             continue
@@ -86,7 +85,7 @@ def get_resource_constraints():
 
 
 def gen_exp(expid, filename, tasks, interval, constraints, exp_type, exp_summary,
-            async=False, custom_scheduler=None, end_interval=None):
+            aiattach_async=False, custom_scheduler=None, end_interval=None):
     with open(filename, "w") as f:
         f.write(description_line.format(exp_type, expid, exp_summary))
         f.write(prefix.format(expid))
@@ -104,9 +103,9 @@ def gen_exp(expid, filename, tasks, interval, constraints, exp_type, exp_summary
         f.write("\n")
 
         for task in tasks:
-            f.write(attach_instance.format(task, "async" if async else ""))
+            f.write(attach_instance.format(task, "async" if aiattach_async else ""))
             f.write(wait_cmd.format(interval))
-        if async:
+        if aiattach_async:
             f.write(wait_for_all_ai_arrival.format(len(tasks)))
         if end_interval is not None:
             f.write(wait_cmd.format(end_interval))
@@ -160,7 +159,7 @@ def gen_exp_scheduler(types, no, task_count, interval, constraints):
             filename = os.path.join(basepath, basename)
             print(f"will generate {filename}")
             gen_exp(expid, filename, tasks, 0, constraints, "scheduler",
-                    exp_summary, async=False, custom_scheduler=custom_scheduler, end_interval=interval)
+                    exp_summary, aiattach_async=False, custom_scheduler=custom_scheduler, end_interval=interval)
 
 
 def parse_args():
@@ -172,6 +171,10 @@ def parse_args():
     parser.add_argument("task_count", metavar="K", type=int, help="Number of tasks deployed in a single experiment.")
     parser.add_argument("-t", dest="types_file", type=str, default=None, help="File with list of task types (each type in a separate line. "\
         "Every task type has to be a valid CBTOOL application instance type e.g. redis_ycsb, hadoop, linpack")
+    parser.add_argument("-tl", dest="types_list", type=str, default=None, help="Comma separate list of task types (each type in a separate line. "\
+        "Every task type has to be a valid CBTOOL application instance type e.g. redis_ycsb, hadoop, linpack")
+    parser.add_argument("-r", dest="resources_file", type=str, default="resources.csv", help="Csv file with cpu and memory average usage for  "\
+        "each task type and vm type. Used to set cpu and memory requests and limits for each pod.")
     parser.add_argument("-m", dest="mode", default="linear", choices=["linear", "mixed", "scheduler"], help="Type of " \
         "generated experiments (default linear). 'linear' - deploys one task of type x and (N-1) tasks of type y." \
         "`mixed` - deploys N tasks of random types, but at least from three different types if possible." \
@@ -196,9 +199,13 @@ def read_task_types_from_file(types_file):
 
 def main():
     args = parse_args()
-    constraints = get_resource_constraints()
+    constraints = []
+    if args.resources_file:
+        constraints = get_resource_constraints(args.resources_file)
     no = args.no
-    if args.types_file:
+    if args.types_list:
+        types = args.types_list.split(",")
+    elif args.types_file:
         types = read_task_types_from_file(args.types_file)
     else:
         types = types_default
