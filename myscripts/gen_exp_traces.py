@@ -173,7 +173,7 @@ def parse_args():
         "Every task type has to be a valid CBTOOL application instance type e.g. redis_ycsb, hadoop, linpack")
     parser.add_argument("-tl", dest="types_list", type=str, default=None, help="Comma separate list of task types (each type in a separate line. "\
         "Every task type has to be a valid CBTOOL application instance type e.g. redis_ycsb, hadoop, linpack")
-    parser.add_argument("-r", dest="resources_file", type=str, default="resources.csv", help="Csv file with cpu and memory average usage for  "\
+    parser.add_argument("-r", dest="resources_file", type=str, default=None, help="Csv file with cpu and memory average usage for  "\
         "each task type and vm type. Used to set cpu and memory requests and limits for each pod.")
     parser.add_argument("-m", dest="mode", default="linear", choices=["linear", "mixed", "scheduler"], help="Type of " \
         "generated experiments (default linear). 'linear' - deploys one task of type x and (N-1) tasks of type y." \
@@ -231,6 +231,7 @@ def main():
         print(f"Unsupported mode {args.mode}")
         return 1
     print(f"Hadoop slave number set to {hadoop_slave_no}")
+    print(f"Resources constraints inferred from file {args.resources_file}")
 
 if __name__ == "__main__":
     main()
