@@ -1018,6 +1018,24 @@ class KubCmds(CommonCloudFunctions) :
                         _obj["kind"] == "Deployment":
             _obj["spec"]["template"]["spec"]["containers"][0]["resources"] = _resources_obj
 
+    @trace
+    def create_affinity_spec(self, ai):
+        return  {
+                    "podAffinity": {
+                        "requiredDuringSchedulingIgnoredDuringExecution" : [
+                            {"labelSelector": {
+                                "matchExpressions": [
+                                    {"key": "ai",
+                                     "operator": "In",
+                                     "values": [ai]
+                                     }
+                                ]
+                            },
+                                "topologyKey": "kubernetes.io/hostname"
+                            },
+                        ]
+                    }
+                }
 
     @trace
     def vmcreate(self, obj_attr_list) :
@@ -1042,7 +1060,7 @@ class KubCmds(CommonCloudFunctions) :
             _taint = False
             _node_name = False
             _custom_scheduler = False
-            _schedule_ai_same_node = False
+            _affinity_spec = dict()
 
             _vmc_attr_list = self.osci.get_object(obj_attr_list["cloud_name"], "VMC", False, obj_attr_list["vmc"], False)
             cbdebug("Pool is: " + _vmc_attr_list["pool"])
@@ -1056,7 +1074,7 @@ class KubCmds(CommonCloudFunctions) :
             if "custom_scheduler" in obj_attr_list:
                 _custom_scheduler = obj_attr_list["custom_scheduler"]
             if "schedule_ai_same_node" in _vmc_attr_list:
-                _schedule_ai_same_node = True
+                _affinity_spec = self.create_affinity_spec(obj_attr_list["ai"])
 
             self.determine_instance_name(obj_attr_list)
             obj_attr_list["cloud_vm_name"] = obj_attr_list["cloud_vm_name"].lower()
@@ -1133,6 +1151,7 @@ class KubCmds(CommonCloudFunctions) :
                                         }
                                      ], 
                                    "imagePullSecrets" : _image_pull_secrets,
+                                   "affinity": _affinity_spec,
                                  }
                        }
 
@@ -1151,24 +1170,6 @@ class KubCmds(CommonCloudFunctions) :
                 if _custom_scheduler:
                     cbdebug("Using custom scheduler: " + str(_custom_scheduler) + " while creating pod.")
                     _obj["spec"]["schedulerName"] = _custom_scheduler
-                if _schedule_ai_same_node:
-                    cbdebug("Schedule pods from one ai on the same node")
-                    _obj["spec"]["affinity"] = {
-                        "podAffinity": {
-                            "requiredDuringSchedulingIgnoredDuringExecution" : [
-                                {"labelSelector": {
-                                    "matchExpressions": [
-                                        {"key": "ai",
-                                         "operator": "In",
-                                         "values": [obj_attr_list["ai"]]
-                                         }
-                                    ]
-                                },
-                                "topologyKey": "kubernetes.io/hostname"
-                                },
-                            ]
-                        }
-                    }
                 elif not _taint and not _node_name :
                     _obj["spec"]["affinity"] = {
                                          "podAntiAffinity" : {
@@ -1222,7 +1223,8 @@ class KubCmds(CommonCloudFunctions) :
                                                                  "imagePullPolicy" : obj_attr_list["image_pull_policy"], \
                                                                }
                                                             ],
-                                                          "imagePullSecrets" : _image_pull_secrets                                                         
+                                                          "imagePullSecrets" : _image_pull_secrets,
+                                                          "affinity": _affinity_spec,
                                                         }
                                                }
                                   }
@@ -1259,7 +1261,8 @@ class KubCmds(CommonCloudFunctions) :
                                                                  "imagePullPolicy" : obj_attr_list["image_pull_policy"], \
                                                                }
                                                             ], 
-                                                          "imagePullSecrets" : _image_pull_secrets                                                         
+                                                          "imagePullSecrets" : _image_pull_secrets,
+                                                          "affinity": _affinity_spec,
                                                         }
                                                }
                                   }
