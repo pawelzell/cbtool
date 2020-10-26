@@ -26,9 +26,9 @@ class ExperimentRecord:
 
 
 class ExperimentSeries:
-    def __init__(self, path, tasks, ai_role_count=None, options=None, node="baati"):
+    def __init__(self, path, node, config):
         self.type = "linear"
-        self.tasks = tasks
+        self.tasks = config.tasks
         self.path = path
         self.node = node
         self.dfs = {}  # Dict with dataframes with resources usage and perf data
@@ -36,8 +36,8 @@ class ExperimentSeries:
         self.interference_matrix = None
         _, self.name = os.path.split(path)
         self.type_pair_to_exp = dict()
-        for t1 in tasks:
-            for t2 in tasks:
+        for t1 in self.tasks:
+            for t2 in self.tasks:
                 exp_paths = self.getExperimentPaths(t1, t2, path)
                 if len(exp_paths) > 1:
                     raise ValueError(f"Found {len(exp_paths)}>1 experiment records for types " \
@@ -50,11 +50,14 @@ class ExperimentSeries:
         print(f"Found {len(self.type_pair_to_exp)} experiment in series {self.name}")
 
         self.ai_role_count = ai_info.AI_ROLE_TO_COUNT.copy()
-        if ai_role_count:
-            self.ai_role_count.update(ai_role_count)
-        self.options = {"interval_boundaries": "max"}
-        if options:
-            self.options.update(options)
+        self.options = {"interval_boundaries": "first_plus_interval"}
+        self.overrideWithConfig(config)
+
+    def overrideWithConfig(self, config):
+        if config.ai_role_count:
+            self.ai_role_count.update(config.ai_role_count)
+        if config.options:
+            self.options.update(config.options)
 
     @staticmethod
     def getExperimentPaths(t1, t2, base_path):

@@ -96,28 +96,6 @@ def analyzeInterferenceGridMultipleSeries(exp_series_list, skip_tasks, inverse_t
     printInterferenceGridMultipleSeries(exp_series_list, skip_tasks, savefig)
 
 
-def analyzeInterferenceGrid(exp_series, skip_tasks=(), inverse_throughput_y=True, fit_intercept=True, task_pair_to_task_limit={}, savefig=False):
+def analyzeInterferenceGrid(exp_series, skip_tasks=(), inverse_throughput_y=True, fit_intercept=False,
+                            task_pair_to_task_limit={}, savefig=False):
     return analyzeInterferenceGridMultipleSeries([exp_series], skip_tasks, inverse_throughput_y, fit_intercept, task_pair_to_task_limit, savefig)
-
-
-def extractInterferenceMatrix(exp_series):
-    n = len(exp_series.tasks)
-    result = np.zeros((n, n))
-    for i, t1 in enumerate(exp_series.tasks):
-        for j, t2 in enumerate(exp_series.tasks):
-            metric = exp_series.getPerfMetricsForTypeShort(t1)
-            try:
-                exp = exp_series.getExperiment(t1, t2)
-            except KeyError:
-                # print(f"WARNING: No experiment data for {t1} {t2}")
-                result[i, j] = 0
-            else:
-                result[i, j] = exp.coefs[1]
-    return result
-
-
-def extractNodeToCoeffs(exp_series_list):
-    results = {}
-    for exp_series in exp_series_list:
-        results[exp_series.node] = exp_series.interference_matrix
-    return results

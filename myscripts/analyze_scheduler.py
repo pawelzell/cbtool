@@ -1,6 +1,7 @@
 import os
 import re
 import ai_info
+import collections
 import glob
 import numpy as np
 import pandas as pd
@@ -12,7 +13,9 @@ from read_data.perf import *
 
 # from read_data.resource import *
 # from analyze_interference import *
-IP_TO_HOST = {"ip_10_2_1_93": "baati", "baati": "baati", "ip_10_2_1_91": "dosa", "dosa": "dosa"}
+#IP_TO_HOST = {"ip_10_2_1_93": "baati", "baati": "baati", "ip_10_2_1_91": "dosa", "dosa": "dosa"}
+# TODO
+IP_TO_HOST = {"puri.mimuw.edu.pl": "puri.mimuw.edu.pl", "kulcha.mimuw.edu.pl": "kulcha.mimuw.edu.pl"}
 METRIC_CBTOOL_PREFIX = "app_"
 
 
@@ -86,28 +89,25 @@ class SchedulerExperimentRecord:
 
 
 class SchedulerExperimentSeries:
-    def __init__(self, base_path, rescale_map, ai_count, ai_types=("redis_ycsb", "wrk", "hadoop", "linpack"),
-                 ai_role_count=None):
-        if ai_role_count is None:
-            ai_role_count = {"hadoopslave": 2}
+    def __init__(self, base_path, config, ai_count):
         self.type = "scheduler"
         self.base_path = base_path
         _, self.name = os.path.split(base_path)
-        self.rescale_map = rescale_map  # hostname to exp_series
+        self.ai_role_count = ai_info.AI_ROLE_TO_COUNT.copy()
+        self.rescale_map = config.rescale_map  # hostname to exp_series
         self.ai_count = ai_count
-        self.ai_types = ai_types
+        self.ai_types = config.tasks
 
         self.experiments = dict()
         self.dfs = {}
         self.df = None
         self.schedules = pd.DataFrame()
 
-        self.ai_role_count = {}
         for _, ai_roles in ai_info.AI_TYPE_TO_ROLE.items():
             for ai_role in ai_roles:
                 self.ai_role_count[ai_role] = 1
-        if ai_role_count:
-            self.ai_role_count.update(ai_role_count)
+        if config.ai_role_count:
+            self.ai_role_count.update(config.ai_role_count)
 
         for exp_match in self.getExperimentPathsMatches(base_path):
             composition_id, shuffle_id, custom_scheduler = exp_match.groups()
@@ -115,7 +115,7 @@ class SchedulerExperimentSeries:
             shuffle_id = int(shuffle_id)
             custom_scheduler = "" if custom_scheduler is None else str(custom_scheduler)
             exp = SchedulerExperimentRecord(base_path, exp_match.string,
-                                            composition_id, shuffle_id, custom_scheduler, ai_types, self)
+                                            composition_id, shuffle_id, custom_scheduler, self.ai_types, self)
             self.experiments[(composition_id, shuffle_id, custom_scheduler)] = exp
         self.readPerf()
         self.aggregatePerf()
@@ -198,7 +198,7 @@ class SchedulerExperimentSeries:
 
     @staticmethod
     def getExperimentPathsMatches(base_path):
-        path_regex = "([0-9]{1,4})scheduler([0-9]{1,2})(_custom|_random|_round_robin){0,1}"
+        path_regex = "([0-9]{1,4})scheduler([0-9]{1,2})(_custom|_random|_round_robin|_default){0,1}"
 
         def matchExpidRegex(e):
             i = e.split("/")[-1]
@@ -261,20 +261,56 @@ class SchedulerExperimentSeries:
         return xs, values
 
 
-def getRescaleFactorMap(host_names, exp_series_list):
-    results = {}
-    for host_name, exp_series in zip(host_names, exp_series_list):
-        df = exp_series.dfs["perf_agg"]
-        result = {}
-        for t1 in df["t1"].unique():
-            result[t1] = {}
-            for metric in ai_info.AI_TYPE_TO_METRICS[t1]:
-                avg_metric = f"avg_{metric}"
-                agg_df = df.loc[(df["t1"] == t1) & (df["ai_no"] == 1) & (df["tasks"] == 1), avg_metric]
-                print(f"Aggregate {exp_series.name} {t1} {metric} {len(agg_df)}")
-                result[t1][metric] = agg_df.mean()
-        results[host_name] = result
-    return results
+class SchedulerMeanMetricComputer:
+    RecordId = collections.namedtuple("RecordId", "host type composition scheduler")
+
+    def __init__(self, ai_types, node_to_coeffs, xs, ys_actual, ys_expected):
+        self.ai_types = ai_types
+        self.node_to_coeffs = node_to_coeffs
+        self.xs = xs
+        self.ys_actual = ys_actual
+        self.ys_expected = ys_expected
+
+    def computeMetricForType(self, t=None, metric_fn=mean_squared_error):
+        data = self.getDataForType(t)
+        _, ys_actual, ys_expected = zip(*data)
+        return metric_fn(ys_actual, ys_expected)
+
+    def getDataForType(self, t):
+        data = zip(self.xs, self.ys_actual, self.ys_expected)
+        if t is None:
+            return data
+        return [(x, y1, y2) for (x, y1, y2) in data if x.type == t]
+
+    def computeMetrics(self, metric_fn=mean_squared_error):
+        result = dict()
+        result["all"] = self.computeMetricForType(metric_fn=metric_fn)
+        for t in self.ai_types:
+            result[t] = self.computeMetricForType(t, metric_fn)
+        return result
+
+    @staticmethod
+    def createFromExpSeries(exp_series, node_to_coeffs):
+        xs_result, ys_actual_result, ys_expected_result = [], [], []
+        df = exp_series.df
+
+        def toRecordId(x, c, s):
+            host, t = x.split(" ")
+            return SchedulerMeanMetricComputer.RecordId(host, t, composition, scheduler)
+
+        for composition in df["composition_id"].unique():
+            for scheduler in df["scheduler"].unique():
+                node_to_loads = exp_series.extractNodeToLoads(composition, 0, scheduler)
+                xs, ys_expected = computeExpectedCost(exp_series.ai_types, node_to_loads, node_to_coeffs)
+                expected_cost_map = dict(zip(xs, ys_expected))
+
+                xs, ys_actual = exp_series.extractActualCosts(composition, 0, scheduler)
+                for x, y_actual in zip(xs, ys_actual):
+                    xs_result.append(toRecordId(x, composition, scheduler))
+                    ys_actual_result.append(y_actual)
+                    ys_expected_result.append(expected_cost_map[x])
+        return SchedulerMeanMetricComputer(exp_series.ai_types, node_to_coeffs, xs_result,
+                                           ys_actual_result, ys_expected_result)
 
 
 def computeExpectedCost(ai_types, node_to_loads, node_to_coefficients):
@@ -330,3 +366,4 @@ def plotActualVsExpectedCost(exp_series, node_to_coefficients, composition_id):
         ax.set_ylim(ymin=0, ymax=ymax)
         ax.legend()
     plt.show()
+
