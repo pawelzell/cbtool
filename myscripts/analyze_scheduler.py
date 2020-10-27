@@ -13,9 +13,9 @@ from read_data.perf import *
 
 # from read_data.resource import *
 # from analyze_interference import *
-#IP_TO_HOST = {"ip_10_2_1_93": "baati", "baati": "baati", "ip_10_2_1_91": "dosa", "dosa": "dosa"}
-# TODO
-IP_TO_HOST = {"puri.mimuw.edu.pl": "puri.mimuw.edu.pl", "kulcha.mimuw.edu.pl": "kulcha.mimuw.edu.pl"}
+NODE_TO_HOSTNAME = {"puri": "puri.mimuw.edu.pl", "kulcha": "kulcha.mimuw.edu.pl",
+                    "baati": "ip_10_2_1_93", "dosa": "ip_10_2_1_91"}
+HOSTNAME_TO_NODE = {host: node for node, host in NODE_TO_HOSTNAME.items()}
 METRIC_CBTOOL_PREFIX = "app_"
 
 
@@ -77,10 +77,10 @@ class SchedulerExperimentRecord:
         ai_name_to_host_and_type = {}
         for _, row in df.iterrows():
             t = row["type"]
-            host = IP_TO_HOST[row["host_name"]]
+            node = HOSTNAME_TO_NODE[row["host_name"]]
             ai_name = row["ai_name"]
 
-            new_record = (host, t)
+            new_record = (node, t)
             present_record = ai_name_to_host_and_type.get(ai_name, new_record)
             if present_record != new_record:
                 raise ValueError(f"{ai_name} - two vms give different results {present_record} vs {new_record}")
@@ -151,10 +151,14 @@ class SchedulerExperimentSeries:
             df = self.df.loc[self.df["expid"] == expid]
             for ai_name in df["ai_name"].unique():
                 df2 = df.loc[df["ai_name"] == ai_name, :]
-                host_name = df2["host_name"].min()
+                host_names = df2["host_name"].unique()
+                if host_names.size != 1:
+                    raise ValueError(f"Unexpected number of host names for single ai_name {ai_name} "
+                                     f"{len(host_names)} != 1")
+                node = HOSTNAME_TO_NODE[host_names[0]]
                 t = df2["type"].min()
                 for metric in ai_info.AI_TYPE_TO_METRICS[t]:
-                    factor = self.rescale_map[host_name][t][metric]
+                    factor = self.rescale_map[node][t][metric]
                     select = (self.df["expid"] == expid) & (df["ai_name"] == ai_name)
                     for mt in ["avg_", "std_"]:
                         input_col = f"{mt}{metric}"
@@ -223,8 +227,8 @@ class SchedulerExperimentSeries:
     def computeScheduleSummary(self):
         self.schedules = pd.DataFrame()
         hosts = list(self.df["host_name"].unique())
-        hosts = sorted([IP_TO_HOST[h] for h in hosts])
-        columns = pd.MultiIndex.from_product([["all"] + hosts, ("all",) + self.ai_types])
+        hosts = sorted([HOSTNAME_TO_NODE[h] for h in hosts])
+        columns = pd.MultiIndex.from_product([["all"] + hosts, ("all",) + tuple(self.ai_types)])
         for composition_id in sorted(self.df["composition_id"].unique()):
             for shuffle_id in [0]:
                 for scheduler in sorted(self.df["scheduler"].unique()):
@@ -252,9 +256,9 @@ class SchedulerExperimentSeries:
         df = df.loc[select, :]
         for _, row in df.iterrows():
             values.append(row["cost"])
-            host = IP_TO_HOST[row["host_name"]]
+            node = HOSTNAME_TO_NODE[row["host_name"]]
             t = row["type"]
-            xs.append(f"{host} {t}")
+            xs.append(f"{node} {t}")
         return xs, values
 
 

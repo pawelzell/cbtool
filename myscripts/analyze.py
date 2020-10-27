@@ -60,7 +60,7 @@ def readPerfVsCpu(exp_series, silent=True, skip_cpu=False):
             exp_series.dfs[f"perf_vs_{cpu_source}"] = perf_vs_cpu
 
     if not skip_cpu:
-        exp_series.df = exp_series.dfs["perf_vs_cpu_agg"]
+        exp_series.df = exp_series.dfs["perf_vs_cpu_node_agg"]
     else:
         exp_series.df = perf
         rescalePerf(exp_series, exp_series.df)
