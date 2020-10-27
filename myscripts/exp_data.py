@@ -26,7 +26,7 @@ class ExperimentRecord:
 
 
 class ExperimentSeries:
-    def __init__(self, path, node, config):
+    def __init__(self, path, node, config, skip_tasks=()):
         self.type = "linear"
         self.tasks = config.tasks
         self.path = path
@@ -38,6 +38,9 @@ class ExperimentSeries:
         self.type_pair_to_exp = dict()
         for t1 in self.tasks:
             for t2 in self.tasks:
+                if (t1, t2) in skip_tasks:
+                    print(f"Skipping task pair {t1} {t2}")
+                    continue
                 exp_paths = self.getExperimentPaths(t1, t2, path)
                 if len(exp_paths) > 1:
                     raise ValueError(f"Found {len(exp_paths)}>1 experiment records for types " \
@@ -98,7 +101,7 @@ class ExperimentSeries:
 
 
 def getTrainingData(exp_series, t1=None, t2=None, x_col="avg_cpu", inverse_throughput_y=False, cpu_limit=None,
-                    x_col_limit=None, subtract_xs=0., subtract_ys=0.):
+                    tasks_limit=None, subtract_xs=0., subtract_ys=0.):
     df = exp_series.df
     if not t1:
         results = [[], [], []]
@@ -117,8 +120,8 @@ def getTrainingData(exp_series, t1=None, t2=None, x_col="avg_cpu", inverse_throu
             selected_rows = selected_rows & (df["t2"] == t2)
         if cpu_limit:
             selected_rows = selected_rows & (df["avg_cpu"] <= cpu_limit)
-        if x_col_limit:
-            selected_rows = selected_rows & (df[x_col] <= x_col_limit)
+        if tasks_limit:
+            selected_rows = selected_rows & (df["tasks"] <= tasks_limit)
         data = df.loc[selected_rows, :]
         if data.empty:
             return np.array([]), np.array([]), np.array([])
@@ -136,10 +139,10 @@ def getTrainingData(exp_series, t1=None, t2=None, x_col="avg_cpu", inverse_throu
 
 
 def getTrainingDataMultipleSeries(exp_series_list, t1=None, t2=None, x_col="avg_cpu", inverse_throughput_y=False,
-                                  cpu_limit=None, x_col_limt=None):
+                                  cpu_limit=None, tasks_limit=None):
     results = [np.array([]) for _ in range(3)]
     for exp_series in exp_series_list:
-        result = getTrainingData(exp_series, t1, t2, x_col, inverse_throughput_y, cpu_limit, x_col_limt)
+        result = getTrainingData(exp_series, t1, t2, x_col, inverse_throughput_y, cpu_limit, tasks_limit)
         for i in range(len(results)):
             results[i] = np.append(results[i], result[i])
     results[0] = results[0].reshape((-1, 1))

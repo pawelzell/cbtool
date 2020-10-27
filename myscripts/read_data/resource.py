@@ -131,7 +131,9 @@ def getCpuAggregateSchedulerExperiment(cpu):
 def getCpuDataAll(exp_series):
     cpu = getCpuData(exp_series)
     agg = getCpuAggregate(cpu)
-    return {"cpu": cpu, "cpu_agg": agg}
+    result = {"cpu": cpu, "cpu_agg": agg}
+    exp_series.dfs.update(result)
+    return result
 
 
 def getCpuDataAllSchedulerExperiment(exp_series):

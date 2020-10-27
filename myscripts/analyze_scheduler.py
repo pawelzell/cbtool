@@ -103,9 +103,6 @@ class SchedulerExperimentSeries:
         self.df = None
         self.schedules = pd.DataFrame()
 
-        for _, ai_roles in ai_info.AI_TYPE_TO_ROLE.items():
-            for ai_role in ai_roles:
-                self.ai_role_count[ai_role] = 1
         if config.ai_role_count:
             self.ai_role_count.update(config.ai_role_count)
 

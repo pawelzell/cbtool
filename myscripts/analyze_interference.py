@@ -19,7 +19,7 @@ def computeInterferenceRegression(exp, inverse_throughput_y, fit_intercept, task
         subtract_xs = subtract_ys = 1.
     xs, ys, ys_error = getTrainingData(exp.exp_series, exp.t1, exp.t2, "tasks",
                                        inverse_throughput_y=inverse_throughput_y,
-                                       x_col_limit=task_limit,
+                                       tasks_limit=task_limit,
                                        subtract_xs=subtract_xs, subtract_ys=subtract_ys)
     reg = linear_model.LinearRegression(fit_intercept=fit_intercept)
     reg.fit(xs, ys)

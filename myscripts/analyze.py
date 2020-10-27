@@ -10,6 +10,7 @@ from read_data.utils import *
 from read_data.resource import *
 from read_data.perf import *
 from analyze_interference import *
+from read_data.os_resource import readCpuNodeResources
 
 
 def rescalePerf(exp_series, df):
@@ -24,15 +25,7 @@ def rescalePerf(exp_series, df):
             df.loc[selected_rows, f"{std_metric}_rescaled"] = df.loc[selected_rows, std_metric] / factor
 
 
-def getPerfVsCpu(cpu_res, perf_res):
-    result = {}
-    result.update(cpu_res)
-    result.update(perf_res)
-    result["perf_vs_cpu"] = result["cpu_agg"].merge(result["perf_agg"], on=["expid", "t1", "t2", "tasks"], how="inner")
-    return result
-
-
-def printPerfVsCpuMultipleSeries(exp_series_list, cpu_limit=None):
+def printPerfVsCpuMultipleSeries(exp_series_list, cpu_limit=None, tasks_limit=None):
     fig, axs = plt.subplots(2, 2, figsize=(10, 10))
     axs = [ax for axs1 in axs for ax in axs1]
     tasks = exp_series_list[0].tasks
@@ -41,31 +34,39 @@ def printPerfVsCpuMultipleSeries(exp_series_list, cpu_limit=None):
         axs[i].set_title(f"performance of {t1}")
         for t2 in tasks:
             xs, ys, ys_err = getTrainingDataMultipleSeries(exp_series_list, t1, t2, inverse_throughput_y=True, \
-                                             x_col="avg_cpu", cpu_limit=cpu_limit)
+                                             x_col="avg_cpu", cpu_limit=cpu_limit, tasks_limit=tasks_limit)
             axs[i].scatter(xs, ys, label=t2)
         axs[i].legend()
     plt.show()
 
 
-def printPerfVsCpu(exp_series, cpu_limit=None):
-    printPerfVsCpuMultipleSeries([exp_series], cpu_limit)
+def printPerfVsCpu(exp_series, cpu_limit=None, tasks_limit=None):
+    printPerfVsCpuMultipleSeries([exp_series], cpu_limit, tasks_limit)
 
 
 def readPerfVsCpu(exp_series, silent=True, skip_cpu=False):
     print(f"perf vs cpu {exp_series.path}")
-    perf_res = getPerfDataAll(exp_series)
-    if skip_cpu:  # Experimental ad-hoc
-        result = {}
-        result.update(perf_res)
-        result["perf_vs_cpu"] = result["perf_agg"]
+    getPerfDataAll(exp_series)
+    perf = exp_series.dfs["perf_agg"]
+
+    if not skip_cpu:
+        getCpuDataAll(exp_series)
+        readCpuNodeResources(exp_series, exp_series.node)
+
+        for cpu_source in ("cpu_agg", "cpu_node_agg"):
+            cpu = exp_series.dfs[cpu_source]
+            perf_vs_cpu = cpu.merge(perf, on=["expid", "t1", "t2", "tasks"], how="inner")
+            rescalePerf(exp_series, perf_vs_cpu)
+            exp_series.dfs[f"perf_vs_{cpu_source}"] = perf_vs_cpu
+
+    if not skip_cpu:
+        exp_series.df = exp_series.dfs["perf_vs_cpu_agg"]
     else:
-        cpu_res = getCpuDataAll(exp_series)
-        result = getPerfVsCpu(cpu_res, perf_res)
-    rescalePerf(exp_series, result["perf_vs_cpu"])
-    exp_series.dfs = result
-    exp_series.df = result["perf_vs_cpu"]
+        exp_series.df = perf
+        rescalePerf(exp_series, exp_series.df)
+
     if not silent:
-        printPerfVsCpu(exp_series, result["perf_vs_cpu"])
+        printPerfVsCpu(exp_series, exp_series.df)
 
 
 def getResourceSinglePod(expid, role, ts, resource="cpu", ai="ai-1"):
@@ -150,7 +151,7 @@ def getMetricStatComparisonDF(exp_series, exp_series_data_dicts, tasks, max_task
     results = pd.DataFrame()
     for metric in getMetricsStatsColumnNames():
         for i, exp_series1 in enumerate(exp_series):
-            df = exp_series_data_dicts[i]["perf_vs_cpu"]
+            df = exp_series_data_dicts[i]["perf_vs_cpu_agg"]
             for task_no in range(1, max_task_count + 1):
                 d = {"exp_series": exp_series1.name, "metric": metric, "ai_no": 1, "tasks": task_no}
                 for t1 in tasks:
@@ -194,3 +195,11 @@ def formatInterferenceMatrixInGoFormat(exp_series_list):
     for exp_series in exp_series_list:
         matrix = extractInterferenceMatrix(exp_series)
         print(f"\"{exp_series.node}\": " + formatMatrix(matrix) + ",")
+
+
+def analyzeInterferenceHelper(name, node, config, skip_cpu=True, skip_tasks=(), data_dir="data"):
+    path = os.path.join(data_dir, name)
+    s = ExperimentSeries(path, node, config, skip_tasks=skip_tasks)
+    readPerfVsCpu(s, skip_cpu=skip_cpu)
+    analyzeInterferenceGrid(s)
+    return s

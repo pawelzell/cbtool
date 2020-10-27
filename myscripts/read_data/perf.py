@@ -66,7 +66,10 @@ def getPerfData(exp_series):
     return results
 
 
+# Saves result in exp_series.dfs dictionary
 def getPerfDataAll(exp_series):
     perf = getPerfData(exp_series)
     agg = getPerfAggregate(exp_series, perf)
-    return {"perf": perf, "perf_agg": agg}
+    result = {"perf": perf, "perf_agg": agg}
+    exp_series.dfs.update(result)
+    return result
