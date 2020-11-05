@@ -166,7 +166,7 @@ def gen_exp_scheduler(types, no, task_count, interval, constraints, aiattach_asy
     tasks = gen_mixed_tasks_list(types, task_count)
     for i in range(scheduler_exp_shuffles_count):
         random.shuffle(tasks)
-        for custom_scheduler, suffix in [("round-robin-scheduler", "_round_robin"), (None, "_default"), ("type-aware-scheduler", "_custom")]:
+        for custom_scheduler, suffix in [(None, "_default"), ("type-aware-scheduler", "_custom")]:
             basename = expid = f"{no}scheduler{i}{suffix}"
             exp_summary = ",".join(tasks)
             filename = os.path.join(basepath, basename)
