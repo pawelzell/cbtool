@@ -1,5 +1,9 @@
 #!/bin/bash
 kDIR="resources"
+if [[ ! -d $kDIR ]]; then
+  mkdir $kDIR
+fi
+
 kINFLUX_POD=`kubectl get pods | awk '/^influx/ {print $1}'`
 echo "Will try to export metrics from influxdb pod: $kINFLUX_POD"
 

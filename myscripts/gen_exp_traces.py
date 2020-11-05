@@ -5,7 +5,7 @@ import os
 import pandas as pd
 types_default = ["redis_ycsb", "wrk", "hadoop", "linpack"]
 hadoop_slave_no = 2
-max_hadoop_count = 8
+max_hadoop_count = 16
 scheduler_exp_shuffles_count = 1
 
 resource_constraints = "typealter {type} {role}_{resource}_{constraint}={value}\n"
@@ -24,6 +24,8 @@ typealter sysbench load_level=1
 typealter oldisim load_level=1
 typealter hadoop load_level=1
 typealter wrk load_level=1
+typealter linpack load_level=2
+typealter redis_ycsb operation_count=450000
 """
 
 ai_type_to_role = {"redis_ycsb": ("ycsb", "redis"), "hadoop": ("hadoopmaster", "hadoopslave"),
@@ -54,6 +56,17 @@ monextract all
 clddetach
 exit
 """
+
+
+def str2bool(v):
+  if isinstance(v, bool):
+    return v
+  if v.lower() in ('yes', 'true', 't', 'y', '1'):
+    return True
+  elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+    return False
+  else:
+    raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
 def is_mixed_tasks_list_valid(tasks):
@@ -148,7 +161,7 @@ def gen_exp_linear(x, y, no, task_count, interval, constraints):
     gen_exp(expid, filename, tasks, interval, constraints, "linear", exp_summary)
 
 
-def gen_exp_scheduler(types, no, task_count, interval, constraints):
+def gen_exp_scheduler(types, no, task_count, interval, constraints, aiattach_async=False):
     basepath = "../traces"
     tasks = gen_mixed_tasks_list(types, task_count)
     for i in range(scheduler_exp_shuffles_count):
@@ -159,7 +172,7 @@ def gen_exp_scheduler(types, no, task_count, interval, constraints):
             filename = os.path.join(basepath, basename)
             print(f"will generate {filename}")
             gen_exp(expid, filename, tasks, 0, constraints, "scheduler",
-                    exp_summary, aiattach_async=False, custom_scheduler=custom_scheduler, end_interval=interval)
+                    exp_summary, aiattach_async=aiattach_async, custom_scheduler=custom_scheduler, end_interval=interval)
 
 
 def parse_args():
@@ -186,6 +199,8 @@ def parse_args():
         "is selected, generates N different experiments.")
     parser.add_argument("-hadoop", metavar="H", dest="max_hadoop_count", type=int, default=None, \
         help="Prevent generation of an experiment with more than H hadoop tasks in order to avoid OOM.")
+    parser.add_argument("-async", metavar="ASYNC", dest="aiattach_async", nargs='?', type=str2bool, const=True, default=False, 
+                        help="If specify provisions tasks in scheduler experiment asynchronously.")
     return parser.parse_args()
 
 
@@ -225,7 +240,7 @@ def main():
             no += 1
     elif args.mode == "scheduler":
         for _ in range(args.experiment_count):
-            gen_exp_scheduler(types, no, args.task_count, args.interval, constraints)
+            gen_exp_scheduler(types, no, args.task_count, args.interval, constraints, args.aiattach_async)
             no += 1
     else:
         print(f"Unsupported mode {args.mode}")

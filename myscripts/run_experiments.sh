@@ -22,7 +22,8 @@ else
     for j in {0..0}; do
         #kEXPFILES+=("${i}scheduler${j}_round_robin")
         kEXPFILES+=("${i}scheduler${j}_custom")
-        kEXPFILES+=("${i}scheduler${j}_random")
+        kEXPFILES+=("${i}scheduler${j}_default")
+        #kEXPFILES+=("${i}scheduler${j}_random")
     done
   done
 fi
@@ -35,12 +36,13 @@ for kEXPFILE in ${kEXPFILES[@]}; do
   echo "Sleep for 15s to make sure that scheduler read the experiment config"
   sleep 15s
   # When abstraction=deployemnt is used there is no need to pull images
-  pull_images
+  #pull_images
   cd .. || exit 1
   echo "Will run cbtool for expfile: $kEXPFILE"
   kEXPID=`awk '/^expid/ {print}' ${kEXPFILE} | sed 's/expid //'`
   echo "Detected expid : $kEXPID"
   sudo ./cb --soft_reset --trace ${kEXPFILE}
+  sudo chown $USER:$USER data/${kEXPID}
   cd -
   ./export_exp.sh ${kEXPID}
 done
