@@ -48,7 +48,7 @@ description_line = "# {} {} {}\n"
 
 attach_instance = "aiattach {} {}\n"
 
-wait_for_all_ai_arrival = "waituntil AI ARRIVED={} increasing 20 72000\n"
+wait_for_all_ai_arrival = "waituntil AI ARRIVED={} increasing 20 7200\n"
 
 suffix = \
 """
@@ -98,7 +98,7 @@ def get_resource_constraints(resource_data_csv):
 
 
 def gen_exp(expid, filename, tasks, interval, constraints, exp_type, exp_summary,
-            aiattach_async=False, custom_scheduler=None, end_interval=None):
+            async_until, custom_scheduler=None):
     with open(filename, "w") as f:
         f.write(description_line.format(exp_type, expid, exp_summary))
         f.write(prefix.format(expid))
@@ -115,13 +115,17 @@ def gen_exp(expid, filename, tasks, interval, constraints, exp_type, exp_summary
             f.write(resource_constraints.format(**c))
         f.write("\n")
 
-        for task in tasks:
-            f.write(attach_instance.format(task, "async" if aiattach_async else ""))
-            f.write(wait_cmd.format(interval))
-        if aiattach_async:
-            f.write(wait_for_all_ai_arrival.format(len(tasks)))
-        if end_interval is not None:
-            f.write(wait_cmd.format(end_interval))
+        async_until = min(int(async_until), len(tasks))
+        for i, task in enumerate(tasks, start=1):
+            if i <= async_until:
+                f.write(attach_instance.format(task, "async"))
+                f.write(wait_cmd.format(0))
+            else:
+                f.write(attach_instance.format(task, ""))
+                f.write(wait_cmd.format(interval))
+            if i == async_until:
+                f.write(wait_for_all_ai_arrival.format(i))
+                f.write(wait_cmd.format(interval))
         f.write("\n")
         f.write(suffix)
 
@@ -147,7 +151,7 @@ def gen_exp_mixed(types, no, task_count, interval, constraints):
     gen_exp(expid, filename, tasks, interval, constraints, "mixed", exp_summary)
 
 
-def gen_exp_linear(x, y, no, task_count, interval, constraints):
+def gen_exp_linear(x, y, no, task_count, interval, constraints, async_until):
     basepath="../traces"
     if x == y:
         basename = f"{x}"
@@ -158,10 +162,10 @@ def gen_exp_linear(x, y, no, task_count, interval, constraints):
     exp_summary = f"{x},{y},{task_count}"
     tasks = [x] + [y] * (task_count-1)
     print(f"will generate {filename} {exp_summary}")
-    gen_exp(expid, filename, tasks, interval, constraints, "linear", exp_summary)
+    gen_exp(expid, filename, tasks, interval, constraints, "linear", exp_summary, async_until)
 
 
-def gen_exp_scheduler(types, no, task_count, interval, constraints, aiattach_async=False):
+def gen_exp_scheduler(types, no, task_count, interval, constraints, async_until):
     basepath = "../traces"
     tasks = gen_mixed_tasks_list(types, task_count)
     for i in range(scheduler_exp_shuffles_count):
@@ -171,8 +175,8 @@ def gen_exp_scheduler(types, no, task_count, interval, constraints, aiattach_asy
             exp_summary = ",".join(tasks)
             filename = os.path.join(basepath, basename)
             print(f"will generate {filename}")
-            gen_exp(expid, filename, tasks, 0, constraints, "scheduler",
-                    exp_summary, aiattach_async=aiattach_async, custom_scheduler=custom_scheduler, end_interval=interval)
+            gen_exp(expid, filename, tasks, interval, constraints, "scheduler",
+                    exp_summary, async_until, custom_scheduler=custom_scheduler)
 
 
 def parse_args():
@@ -195,12 +199,12 @@ def parse_args():
         "with different order of tasks.")
     parser.add_argument("-i", metavar="I", dest="interval", type=int, default=20, help="Number of minutes" \
         " to wait between deployment of two consecutive tasks.")
-    parser.add_argument("-n", metavar="N", dest="experiment_count", type=int, default=10, help="If mixed mode " \
+    parser.add_argument("-n", metavar="N", dest="experiment_count", type=int, default=3, help="If mixed mode " \
         "is selected, generates N different experiments.")
     parser.add_argument("-hadoop", metavar="H", dest="max_hadoop_count", type=int, default=None, \
         help="Prevent generation of an experiment with more than H hadoop tasks in order to avoid OOM.")
-    parser.add_argument("-async", metavar="ASYNC", dest="aiattach_async", nargs='?', type=str2bool, const=True, default=False, 
-                        help="If specify provisions tasks in scheduler experiment asynchronously.")
+    parser.add_argument("-async", metavar="A", dest="async_until", type=int, default=0, 
+                        help="Attach tasks asyncronously until first A tasks start.")
     return parser.parse_args()
 
 
@@ -232,7 +236,7 @@ def main():
         for x in types:
             for y in types:
                 task_count = args.task_count if y != "hadoop" else min(args.task_count, max_hadoop_count)
-                gen_exp_linear(x, y, no, task_count, args.interval, constraints)
+                gen_exp_linear(x, y, no, task_count, args.interval, constraints, args.async_until)
                 no += 1
     elif args.mode == "mixed":
         for _ in range(args.experiment_count):
@@ -240,7 +244,7 @@ def main():
             no += 1
     elif args.mode == "scheduler":
         for _ in range(args.experiment_count):
-            gen_exp_scheduler(types, no, args.task_count, args.interval, constraints, args.aiattach_async)
+            gen_exp_scheduler(types, no, args.task_count, args.interval, constraints, args.async_until)
             no += 1
     else:
         print(f"Unsupported mode {args.mode}")
