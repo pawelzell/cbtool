@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn import linear_model
 from sklearn.metrics import mean_squared_error
+from exp_data_utils import ExperimentTrace
 
 import ai_info
 
@@ -17,12 +18,7 @@ class ExperimentRecord:
         self.path = path
         self.base_path, self.expid = os.path.split(path)
         self.exp_series = exp_series
-        self.reg = None
-        self.coefs = [0., 0.]
-        self.error = np.nan
-        self.xs = []
-        self.ys = []
-        self.ys_error = []
+        self.trace = ExperimentTrace.parseTrace(path, t1, t2)
 
 
 class ExperimentSeries:
@@ -35,22 +31,23 @@ class ExperimentSeries:
         self.df = None  # Main dataframe with aggregated performance vs cpu data
         self.interference_matrix = None
         _, self.name = os.path.split(path)
-        self.type_pair_to_exp = dict()
+        self.type_pair_to_exps = dict()
+        self.type_pair_to_regression = dict()
+        exp_count = 0
         for t1 in self.tasks:
             for t2 in self.tasks:
                 if (t1, t2) in skip_tasks:
                     print(f"Skipping task pair {t1} {t2}")
                     continue
                 exp_paths = self.getExperimentPaths(t1, t2, path)
+                exps = []
                 if len(exp_paths) > 1:
-                    raise ValueError(f"Found {len(exp_paths)}>1 experiment records for types " \
-                                     f"{t1} {t2} in directory {path}")
-                elif len(exp_paths) == 1:
-                    self.type_pair_to_exp[(t1, t2)] = ExperimentRecord(t1, t2, exp_paths[0], self)
-                else:
-                    pass
-                    #print(f"Missing record for {t1} {t2}")
-        print(f"Found {len(self.type_pair_to_exp)} experiment in series {self.name}")
+                    print(f"INFO: Found multiple experiments ({len(exp_paths)}) for {t1} {t2}")
+                for exp_path in exp_paths:
+                    exps.append(ExperimentRecord(t1, t2, exp_path, self))
+                    exp_count += 1
+                self.type_pair_to_exps[(t1, t2)] = exps
+        print(f"Found {exp_count} experiments for {len(self.type_pair_to_exps)} type pairs in series {self.name}")
 
         self.ai_role_count = ai_info.AI_ROLE_TO_COUNT.copy()
         self.options = {"interval_boundaries": "first_plus_interval"}
@@ -74,9 +71,6 @@ class ExperimentSeries:
         pattern = os.path.join(base_path, f"*{expid}")
         expids = glob.glob(pattern)
         return [e for e in expids if matchExpidRegex(e)]
-
-    def getExperiment(self, t1, t2):
-        return self.type_pair_to_exp[(t1, t2)]
 
     def getPerfMetricsForType(self, t1):
         if t1 not in ai_info.AI_TYPE_TO_METRICS:

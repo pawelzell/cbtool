@@ -27,18 +27,19 @@ def readCpuNodeResources(exp_series, node, resource_columns=None):
 def readNodeResources(exp_series, resource_path, res_group_name, resource_columns=None):
     node_res_result = pd.DataFrame()
     node_res_agg_result = pd.DataFrame()
-    for exp in exp_series.type_pair_to_exp.values():
-        print(f"Read node resources for {exp.t1} {exp.t2} from {resource_path}")
-        node_res, node_res_agg = readNodeResourcesExp(exp_series, exp, resource_path)
-        node_res_result = node_res_result.append(node_res, ignore_index=True)
-        node_res_agg_result = node_res_agg_result.append(node_res_agg, ignore_index=True)
+    for exps in exp_series.type_pair_to_exps.values():
+        for exp in exps:
+            print(f"Read node resources for {exp.t1} {exp.t2} from {resource_path}")
+            node_res, node_res_agg = readNodeResourcesExp(exp_series, exp, resource_path)
+            node_res_result = node_res_result.append(node_res, ignore_index=True)
+            node_res_agg_result = node_res_agg_result.append(node_res_agg, ignore_index=True)
     result = {f"{res_group_name}": node_res_result, f"{res_group_name}_agg": node_res_agg_result}
     exp_series.dfs.update(result)
     return result
 
 
 def aggregateNodeResourcesForInterval(exp, df, tasks):
-    d = {"expid": exp.expid, "t1": exp.t1, "t2": exp.t2, "tasks": tasks}
+    d = {"exp_id": exp.expid, "t1": exp.t1, "t2": exp.t2, "tasks": tasks}
     for m in df.columns:
         if m not in COLUMN_EXCLUDE_LIST:
             d.update({f"avg_{m}": df[m].mean(), f"std_{m}": df[m].std()})
@@ -47,7 +48,7 @@ def aggregateNodeResourcesForInterval(exp, df, tasks):
 
 def getSplitIntervalsFromExp(exp_series, exp):
     perf = exp_series.dfs["perf"]
-    perf = perf.loc[perf["expid"] == exp.expid, :]
+    perf = perf.loc[perf["exp_id"] == exp.expid, :]
     return getSplitIntervals(perf, exp_series.getSplitIntervalMethod())
 
 

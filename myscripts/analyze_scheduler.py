@@ -1,6 +1,7 @@
 import os
 import re
 import ai_info
+import global_config
 import collections
 import glob
 import numpy as np
@@ -10,6 +11,7 @@ from sklearn import linear_model
 from sklearn.metrics import mean_squared_error
 from read_data.utils import *
 from read_data.perf import *
+from analyze_interference import computeExpectedCost
 
 # from read_data.resource import *
 # from analyze_interference import *
@@ -30,10 +32,11 @@ class SchedulerExperimentRecord:
         self.ai_types = ai_types
         self.exp_series = exp_series
         self.split_interval = None
+        self.checkOneAIOneHost()
 
     def getSplitInterval(self, df):
         mins = [df.loc[df["ai_name"] == name, "datetime"].min() for name in df["ai_name"].unique()]
-        return max(mins), df["datetime"].max()
+        return max(mins) + pd.Timedelta(minutes=2), df["datetime"].max()
 
     def aggregatePerfForAiNameAndMetric(self, df, d, metric, ai_name):
         df = df.loc[df[metric].notna(), :]
@@ -44,7 +47,7 @@ class SchedulerExperimentRecord:
         return getPerfAggregateForMetricHelper(df, d, metric)
 
     def aggregatePerfForAiName(self, df, ai_name):
-        d = {"expid": self.expid, "composition_id": self.composition_id, "shuffle_id": self.shuffle_id,
+        d = {"exp_id": self.expid, "composition_id": self.composition_id, "shuffle_id": self.shuffle_id,
              "scheduler": self.custom_scheduler, "ai_name": ai_name}
         df = df.loc[(df["ai_name"] == ai_name), :]
         host_names = df["host_name"].unique()
@@ -73,7 +76,7 @@ class SchedulerExperimentRecord:
         return results
 
     def computeAINameToHostAndTypeMap(self, df):
-        df = df.loc[df["expid"] == self.expid, :]
+        df = df.loc[df["exp_id"] == self.expid, :]
         ai_name_to_host_and_type = {}
         for _, row in df.iterrows():
             t = row["type"]
@@ -87,9 +90,17 @@ class SchedulerExperimentRecord:
             ai_name_to_host_and_type[ai_name] = new_record
         return ai_name_to_host_and_type
 
+    def checkOneAIOneHost(self):
+        path = os.path.join(self.path, f"VM_management_{self.expid}.csv")
+        df = pd.read_csv(path, skiprows=57)
+        for ai in df["ai_name"].unique():
+            host_names = df.loc[(df["ai_name"] == ai), "host_name"].unique()
+            if len(host_names) != 1:
+                raise ValueError(f"Ai spans more than one host {self.expid} {ai} {host_names}")
+
 
 class SchedulerExperimentSeries:
-    def __init__(self, base_path, config, ai_count):
+    def __init__(self, base_path, config, ai_count, skip_compositions=()):
         self.type = "scheduler"
         self.base_path = base_path
         _, self.name = os.path.split(base_path)
@@ -109,6 +120,9 @@ class SchedulerExperimentSeries:
         for exp_match in self.getExperimentPathsMatches(base_path):
             composition_id, shuffle_id, custom_scheduler = exp_match.groups()
             composition_id = int(composition_id)
+            if composition_id in skip_compositions:
+                print(f"Skipping composition {composition_id}")
+                continue
             shuffle_id = int(shuffle_id)
             custom_scheduler = "" if custom_scheduler is None else str(custom_scheduler)
             exp = SchedulerExperimentRecord(base_path, exp_match.string,
@@ -128,27 +142,26 @@ class SchedulerExperimentSeries:
         for k, exp in self.experiments.items():
             composition_id, shuffle_id, custom_scheduler = k
             df = readExp(exp)
-            df["expid"] = exp.expid
+            df["exp_id"] = exp.expid
             df["composition_id"] = composition_id
             df["shuffle_id"] = shuffle_id
             df["custom_scheduler"] = custom_scheduler
             perf = perf.append(df, ignore_index=True)
-            # TODO count number of tasks per type
         self.dfs["perf"] = perf
 
     def aggregatePerf(self):
         results = pd.DataFrame()
         perf = self.dfs["perf"]
         for k, exp in self.experiments.items():
-            df = perf.loc[(perf["expid"] == exp.expid), :]
+            df = perf.loc[(perf["exp_id"] == exp.expid), :]
             result = exp.aggregatePerf(df)
             results = results.append(result, ignore_index=True)
         self.dfs["perf_agg"] = results
         self.df = results
 
     def rescalePerf(self):
-        for expid in self.df["expid"].unique():
-            df = self.df.loc[self.df["expid"] == expid]
+        for expid in self.df["exp_id"].unique():
+            df = self.df.loc[self.df["exp_id"] == expid]
             for ai_name in df["ai_name"].unique():
                 df2 = df.loc[df["ai_name"] == ai_name, :]
                 host_names = df2["host_name"].unique()
@@ -159,30 +172,30 @@ class SchedulerExperimentSeries:
                 t = df2["type"].min()
                 for metric in ai_info.AI_TYPE_TO_METRICS[t]:
                     factor = self.rescale_map[node][t][metric]
-                    select = (self.df["expid"] == expid) & (df["ai_name"] == ai_name)
+                    select = (self.df["exp_id"] == expid) & (df["ai_name"] == ai_name)
                     for mt in ["avg_", "std_"]:
                         input_col = f"{mt}{metric}"
                         output_col = f"rescaled_{input_col}"
                         self.df.loc[select, output_col] = self.df.loc[select, input_col] / factor
 
     def computeCost(self):
-        for expid in self.df["expid"].unique():
-            df = self.df.loc[self.df["expid"] == expid]
+        for expid in self.df["exp_id"].unique():
+            df = self.df.loc[self.df["exp_id"] == expid]
             for ai_name in df["ai_name"].unique():
                 df2 = df.loc[df["ai_name"] == ai_name, :]
                 t = df2["type"].min()
                 metric = ai_info.AI_TYPE_TO_METRICS[t][0]
                 output_col = "cost"
                 input_col = f"rescaled_avg_{metric}"
-                select = (self.df["expid"] == expid) & (df["ai_name"] == ai_name)
+                select = (self.df["exp_id"] == expid) & (df["ai_name"] == ai_name)
                 if metric == "throughput":
                     self.df.loc[select, output_col] = 1. / self.df.loc[select, input_col]
                 else:
                     self.df.loc[select, output_col] = self.df.loc[select, input_col]
-            select = self.df.expid == expid
+            select = self.df.exp_id == expid
             self.df.loc[select, "max_cost"] = self.df.loc[select, "cost"].max()
 
-    def printExperimentResults(self):
+    def printExperimentResults(self, savefig=False):
         xs = []
         ys_map = {s: [] for s in sorted(self.df["scheduler"].unique())}
         for i, composition in enumerate(sorted(self.df["composition_id"].unique())):
@@ -191,10 +204,17 @@ class SchedulerExperimentSeries:
                 select = (self.df["composition_id"] == composition) & (self.df["scheduler"] == scheduler)
                 ys_map[scheduler].append(self.df.loc[select, "max_cost"].min())
         fig, ax = plt.subplots()
+        plt.title("Scheduler cost")
         for k, v in ys_map.items():
             ax.scatter(xs, v, label=k[1:])
+        ax.set_ylabel("Max observed cost")
         ax.legend()
-        plt.show()
+        if savefig:
+            file_name = f"scheduler_results_{self.name}"
+            file_name = os.path.join(global_config.PLOTS_DIR, file_name)
+            plt.savefig(file_name)
+        else:
+            plt.show()
         return xs, ys_map
 
     @staticmethod
@@ -302,7 +322,7 @@ class SchedulerMeanMetricComputer:
         for composition in df["composition_id"].unique():
             for scheduler in df["scheduler"].unique():
                 node_to_loads = exp_series.extractNodeToLoads(composition, 0, scheduler)
-                xs, ys_expected = computeExpectedCost(exp_series.ai_types, node_to_loads, node_to_coeffs)
+                xs, ys_expected = computeExpectedCostMultipleNodes(exp_series.ai_types, node_to_loads, node_to_coeffs)
                 expected_cost_map = dict(zip(xs, ys_expected))
 
                 xs, ys_actual = exp_series.extractActualCosts(composition, 0, scheduler)
@@ -314,27 +334,16 @@ class SchedulerMeanMetricComputer:
                                            ys_actual_result, ys_expected_result)
 
 
-def computeExpectedCost(ai_types, node_to_loads, node_to_coefficients):
+def computeExpectedCostMultipleNodes(ai_types, node_to_loads, node_to_coefficients):
     values = []
     xs = []
-    n = len(ai_types)
     for node in node_to_loads.keys():
-        loads = node_to_loads[node]
-        coeffs = node_to_coefficients[node]
-        for i, ai_type in enumerate(ai_types):
-            cost = 0.
-            if loads[i] > 0:
-                cost = 1.
-                loads[i] -= 1.
-                for j in range(n):
-                    cost += loads[j] * coeffs[i][j]
-                loads[i] += 1.
-            values.append(cost)
-            xs.append(f"{node} {ai_type}")
+        values.extend(computeExpectedCost(node_to_loads[node], node_to_coefficients[node]))
+        xs.extend([f"{node} {t}" for t in ai_types])
     return xs, values
 
 
-def plotActualVsExpectedCost(exp_series, node_to_coefficients, composition_id):
+def plotActualVsExpectedCost(exp_series, node_to_coefficients, composition_id, savefig=False):
     k = len(exp_series.df["scheduler"].unique())
     fig, axs = plt.subplots(1, k, figsize=(k * 5, 4))
     schedulers, actual_res, model_res = [], [], []
@@ -351,7 +360,7 @@ def plotActualVsExpectedCost(exp_series, node_to_coefficients, composition_id):
         ymax = updateResultList(actual, actual_res, ymax)
 
         node_to_loads = exp_series.extractNodeToLoads(composition_id, 0, scheduler)
-        model = computeExpectedCost(exp_series.ai_types, node_to_loads, node_to_coefficients)
+        model = computeExpectedCostMultipleNodes(exp_series.ai_types, node_to_loads, node_to_coefficients)
         ymax = updateResultList(model, model_res, ymax)
 
     for i, (scheduler, actual, model) in enumerate(zip(schedulers, actual_res, model_res)):
@@ -363,8 +372,16 @@ def plotActualVsExpectedCost(exp_series, node_to_coefficients, composition_id):
         ax.set_ylabel("Performance cost")
         ax.scatter(xs_model, values_model, label="predicted")
         ax.scatter(xs_actual, values_actual, label="observed")
-        ax.tick_params('x', labelrotation=45)
+        ax.tick_params('x', labelrotation=60)
         ax.set_ylim(ymin=0, ymax=ymax)
         ax.legend()
-    plt.show()
+
+    if savefig:
+        file_name = f"scheduler_observed_vs_predicted_{exp_series.name}_{composition_id}"
+        file_name = os.path.join(global_config.PLOTS_DIR, file_name)
+        plt.savefig(file_name)
+    else:
+        plt.show()
+
+    return schedulers, actual_res, model_res
 

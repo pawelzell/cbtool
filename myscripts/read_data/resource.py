@@ -28,13 +28,13 @@ def getResourceDatapointValues(d, ts, df):
 
 # DF: expid, t1, t2, ai_no, ai_role, tasks, avg_cpu, std_cpu, cpu_samples_count
 def getResourceDatapointLinearExperiment(expid, ai_no, ai_role, tasks, ts, df):
-    d = {"expid": expid.expid, "t1": expid.t1, "t2": expid.t2, "ai_no": ai_no + 1,
+    d = {"exp_id": expid.expid, "t1": expid.t1, "t2": expid.t2, "ai_no": ai_no + 1,
          "ai_role": ai_role, "tasks": tasks + 1}
     return getResourceDatapointValues(d, ts, df)
 
 
 def getResourceDatapointSchedulerExperiment(expid, ai_no, ai_role, host, ts, df):
-    d = {"expid": expid.expid, "composition_id": expid.composition_id, "shuffle_id": expid.shuffle_id,
+    d = {"exp_id": expid.expid, "composition_id": expid.composition_id, "shuffle_id": expid.shuffle_id,
          "scheduler": expid.custom_scheduler, "ai_no": ai_no+1, "ai_role": ai_role, "host": host}
     return getResourceDatapointValues(d, ts, df)
 
@@ -116,14 +116,14 @@ def getCpuDataSchedulerExperiment(exp_series):
 
 def getCpuAggregate(cpu):
     print("Aggregating cpu data")
-    cpu_sum = cpu.groupby(["expid", "t1", "t2", "tasks"], as_index=False).sum()
+    cpu_sum = cpu.groupby(["exp_id", "t1", "t2", "tasks"], as_index=False).sum()
     cpu_sum.pop("ai_no")
     return cpu_sum
 
 
 def getCpuAggregateSchedulerExperiment(cpu):
     print("Aggregating cpu data")
-    cpu_sum = cpu.groupby(["expid", "composition_id", "shuffle_id", "scheduler", "host"], as_index=False).sum()
+    cpu_sum = cpu.groupby(["exp_id", "composition_id", "shuffle_id", "scheduler", "host"], as_index=False).sum()
     cpu_sum.pop("ai_no")
     return cpu_sum
 

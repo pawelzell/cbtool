@@ -23,9 +23,10 @@ def rescalePerf(exp_series, df):
             selected_rows = (df["t1"] == t1) & (df["t2"] == t2) & (df["ai_no"] == 1)
             df.loc[selected_rows, f"{avg_metric}_rescaled"] = df.loc[selected_rows, avg_metric] / factor
             df.loc[selected_rows, f"{std_metric}_rescaled"] = df.loc[selected_rows, std_metric] / factor
+    #df.loc[:, "avg_throughput_rescaled_inverse"] = 1. / df.loc[:, "avg_throughput_rescaled"]
 
 
-def printPerfVsCpuMultipleSeries(exp_series_list, cpu_limit=None, tasks_limit=None):
+def printPerfVsCpuMultipleSeries(exp_series_list, cpu_limit=None, tasks_limit=None, savefig=False):
     fig, axs = plt.subplots(2, 2, figsize=(10, 10))
     axs = [ax for axs1 in axs for ax in axs1]
     tasks = exp_series_list[0].tasks
@@ -37,11 +38,17 @@ def printPerfVsCpuMultipleSeries(exp_series_list, cpu_limit=None, tasks_limit=No
                                              x_col="avg_cpu", cpu_limit=cpu_limit, tasks_limit=tasks_limit)
             axs[i].scatter(xs, ys, label=t2)
         axs[i].legend()
-    plt.show()
+
+    if savefig:
+        file_name = f"{exp_series_list[0].node}_perf_vs_cpu"
+        plt.savefig(file_name)
+        print(f"Figure saved to {file_name}")
+    else:
+        plt.show()
 
 
-def printPerfVsCpu(exp_series, cpu_limit=None, tasks_limit=None):
-    printPerfVsCpuMultipleSeries([exp_series], cpu_limit, tasks_limit)
+def printPerfVsCpu(exp_series, cpu_limit=None, tasks_limit=None, savefig=False):
+    printPerfVsCpuMultipleSeries([exp_series], cpu_limit, tasks_limit, savefig)
 
 
 def readPerfVsCpu(exp_series, silent=True, skip_cpu=False):
@@ -55,7 +62,7 @@ def readPerfVsCpu(exp_series, silent=True, skip_cpu=False):
 
         for cpu_source in ("cpu_agg", "cpu_node_agg"):
             cpu = exp_series.dfs[cpu_source]
-            perf_vs_cpu = cpu.merge(perf, on=["expid", "t1", "t2", "tasks"], how="inner")
+            perf_vs_cpu = cpu.merge(perf, on=["exp_id", "t1", "t2", "tasks"], how="inner")
             rescalePerf(exp_series, perf_vs_cpu)
             exp_series.dfs[f"perf_vs_{cpu_source}"] = perf_vs_cpu
 
@@ -95,12 +102,16 @@ def getResourceLimits(exp_series):
     results = pd.DataFrame()
     for ai_type in exp_series.tasks:
         try:
-            expid = exp_series.getExperiment(ai_type, ai_type)
-        except KeyError:
-            print(f"ERROR: Experiment for a type pair {ai_type},{ai_type} not found. Skipping.")
+            exps = exp_series.type_pair_to_exps[(ai_type, ai_type)]
+            if len(exps) > 1:
+                raise KeyError("Multiple experiments")
+            exp = exps[0]
+        except (KeyError, IndexError):
+            print(f"ERROR: Experiment for a type pair {ai_type},{ai_type} not found or multiple experiments found"
+                  f"(this is not supported yet) Skipping.")
             continue
-        print(expid.expid)
-        df = readExp(expid)
+        print(exp.expid)
+        df = readExp(exp)
         if "ai_2" in df["ai_name"].unique():
             tmax = df.loc[df["ai_name"] == "ai_2", "datetime"].min()
         else:
@@ -109,7 +120,7 @@ def getResourceLimits(exp_series):
         ts = (tmin, tmax)
         for role in ai_info.AI_TYPE_TO_ROLE[ai_type]:
             for resource in ["cpu", "memory"]:
-                df = getResourceSinglePod(expid, role, ts, resource)
+                df = getResourceSinglePod(exp, role, ts, resource)
                 record = getResourceLimitsRecord(ai_type, role, resource, df)
                 results = results.append(toSingleRowDF(record), ignore_index=True)
     return results
@@ -128,36 +139,6 @@ def getMetricsStatsColumnNames(quantiles=(0.25, 0.5, 0.75)):
         results += [f"{m}_samples_count", f"avg_{m}", f"std_{m}"]
         for q in quantiles:
             results.append(formatQuantileColumnName(m, q))
-    return results
-
-
-def updateRowWithMetricsIfExists(df, exp_series, t1, t2, tasks, metric, d):
-    try:
-        expid = exp_series.getExperiment(t1, t2)
-    except KeyError:
-        return d
-    values = df.loc[
-        (df["t1"] == t1) & (df["t2"] == t2) & (df["ai_no"] == 1) & (df["tasks"] == tasks), metric].to_numpy()
-    if values.size > 1:
-        raise ValueError(f"Got unexpected number of values {values.size} for " \
-                         f"{t1} {t2} {tasks} {metric}")
-    elif values.size == 1:
-        d.update({f"{t1}_{t2}": values[0]})
-    return d
-
-
-# cols: [expid, metric], exp1 exp2 exp3, ...
-def getMetricStatComparisonDF(exp_series, exp_series_data_dicts, tasks, max_task_count):
-    results = pd.DataFrame()
-    for metric in getMetricsStatsColumnNames():
-        for i, exp_series1 in enumerate(exp_series):
-            df = exp_series_data_dicts[i]["perf_vs_cpu_agg"]
-            for task_no in range(1, max_task_count + 1):
-                d = {"exp_series": exp_series1.name, "metric": metric, "ai_no": 1, "tasks": task_no}
-                for t1 in tasks:
-                    for t2 in tasks:
-                        d = updateRowWithMetricsIfExists(df, exp_series1, t1, t2, task_no, metric, d)
-                results.append(toSingleRowDF(d), ignore_index=True)
     return results
 
 
@@ -193,7 +174,7 @@ def formatInterferenceMatrixInGoFormat(exp_series_list):
         res += "}"
         return res
     for exp_series in exp_series_list:
-        matrix = extractInterferenceMatrix(exp_series)
+        matrix = exp_series.interference_matrix
         print(f"\"{exp_series.node}\": " + formatMatrix(matrix) + ",")
 
 

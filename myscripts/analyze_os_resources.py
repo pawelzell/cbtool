@@ -2,7 +2,7 @@ from read_data.os_resource import readOsResources
 from sklearn import linear_model
 
 
-NON_RESOURCES_COLUMN = ("datetime", "time", "t1", "t2", "expid", "tasks")
+NON_RESOURCES_COLUMN = ("datetime", "time", "t1", "t2", "exp_id", "tasks")
 
 
 def getResourcesNamesSortedByCorrelation(exp_series, t1, t2):

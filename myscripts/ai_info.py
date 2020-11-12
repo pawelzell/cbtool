@@ -19,3 +19,12 @@ AI_ROLE_TO_COUNT = {role: 1 for role in AI_ROLE_TO_TYPE.keys()}
 AI_ROLE_TO_COUNT_OVERRIDE = {"hadoopslave": 2, "mongodb": 3, "oldisimleaf": 2}
 AI_ROLE_TO_COUNT.update(AI_ROLE_TO_COUNT_OVERRIDE)
 
+
+def getPerfColName(t):
+    m = AI_TYPE_TO_METRICS[t][0]
+    metric = f"avg_{m}_rescaled"
+    if m == "throughput":
+        metric = f"{metric}_inverse"
+    return metric
+
+
