@@ -244,7 +244,7 @@ def main():
             no += 1
     elif args.mode == "scheduler":
         for _ in range(args.experiment_count):
-            gen_exp_scheduler(types, no, args.task_count, args.interval, constraints, args.async_until)
+            gen_exp_scheduler(types, no, args.task_count, args.interval, constraints, args.task_count)
             no += 1
     else:
         print(f"Unsupported mode {args.mode}")

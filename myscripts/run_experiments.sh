@@ -20,17 +20,14 @@ else
   kEXPFILES=()
   for i in $(eval echo {$2..$3}); do
     for j in {0..0}; do
-        #kEXPFILES+=("${i}scheduler${j}_round_robin")
         kEXPFILES+=("${i}scheduler${j}_custom")
         kEXPFILES+=("${i}scheduler${j}_default")
-        #kEXPFILES+=("${i}scheduler${j}_random")
     done
   done
 fi
 
 for kEXPFILE in ${kEXPFILES[@]}; do
   kEXPFILE="myscripts/$kEXPDIR/$kEXPFILE"
-  ./export_config_to_scheduler.sh ../${kEXPFILE} random-scheduler
   ./export_config_to_scheduler.sh ../${kEXPFILE} type-aware-scheduler
   ./clear_influxdb.sh
   echo "Sleep for 15s to make sure that scheduler read the experiment config"
